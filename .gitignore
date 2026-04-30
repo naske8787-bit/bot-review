@@ -1,0 +1,21 @@
+# Python environment
+.venv/
+
+# Bytecode caches
+**/__pycache__/
+*.py[cod]
+
+# Local secrets and generated bot artifacts
+trading_bot/.env
+crypto_bot/.env
+asx_bot/.env
+forex_bot/.env
+india_bot/.env
+*.env.bak*
+*.env.backup
+trading_bot/bot.log
+trading_bot/output.log
+trading_bot/supervisor.log
+trading_bot/*.pid
+trading_bot/logs/
+trading_bot/models/scaler.pkl

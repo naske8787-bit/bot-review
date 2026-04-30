@@ -1,0 +1,45 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+users:
+  - default
+
+write_files:
+  - path: /usr/local/bin/capitol-firstboot.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      REPO_URL="https://github.com/naske8787-bit/Capitol_Trades_API.git"
+      BRANCH="main"
+      APP_DIR="/opt/Capitol_Trades_API"
+      APP_USER="ubuntu"
+
+      apt-get update
+      apt-get -y install git
+
+      if [[ ! -d "$APP_DIR/.git" ]]; then
+        rm -rf "$APP_DIR"
+        git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
+      else
+        git -C "$APP_DIR" fetch origin "$BRANCH"
+        git -C "$APP_DIR" checkout "$BRANCH"
+        git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
+      fi
+
+      bash "$APP_DIR/deploy/aws/bootstrap_ec2.sh" \
+        --repo-url "$REPO_URL" \
+        --branch "$BRANCH" \
+        --app-dir "$APP_DIR" \
+        --app-user "$APP_USER"
+
+      # Start services after bootstrap + env file creation.
+      systemctl restart capitol-api capitol-dashboard capitol-trading-bot capitol-crypto-bot capitol-asx-bot capitol-forex-bot capitol-tech-research-bot || true
+
+runcmd:
+  - [bash, -lc, /usr/local/bin/capitol-firstboot.sh]
+
+final_message: "Capitol_Trades_API first boot complete. Configure /etc/capitol-trades/capitol-trades.env if needed."

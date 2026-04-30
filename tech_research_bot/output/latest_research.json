@@ -1,0 +1,207 @@
+{
+  "generated_at": "2026-04-30T09:58:38.087866+00:00",
+  "min_probability_threshold": 0.65,
+  "candidate_count": 12,
+  "avg_probability": 0.9231,
+  "methodology": "keyword-weighted impact scoring with probability normalization and source deduplication",
+  "top_candidates": [
+    {
+      "title": "Claude Code costs up to $200 a month. Goose does the same thing for free.",
+      "link": "https://venturebeat.com/infrastructure/claude-code-costs-up-to-usd200-a-month-goose-does-the-same-thing-for-free",
+      "published": "Mon, 19 Jan 2026 14:00:00 GMT",
+      "published_iso": "2026-01-19T14:00:00+00:00",
+      "theme": "ai_frontier",
+      "impact_score": 10.0,
+      "probability_significant_impact": 0.9852,
+      "rationale": [
+        "artificial intelligence(+3.0)",
+        "agentic(+2.5)",
+        "autonomous(+2.0)",
+        "gpu(+2.0)",
+        "inference(+1.6)",
+        "commercial(+1.5)",
+        "canceled(-2.0)",
+        "pilot+commercial(+0.8)"
+      ],
+      "source": "https://venturebeat.com/category/ai/feed/"
+    },
+    {
+      "title": "QuantumScape (QS) is building a foundation of partners to commercialize solid-state battery production - Electrek",
+      "link": "https://news.google.com/rss/articles/CBMizAFBVV95cUxPa2VwQjR0ZTVMUXRJUU9lTXRYN21BZlBGTTVhTjJqZTVwd3EzUzhPck1qZWRjZDJ6bkR1N2E4ZldESlNKdThnVEx2TlVCekMwZUc1WWZFdk9HR1dpZGRtN2F4SVZ2RTA3QnRlNU5rdWNXd0tjbDB6eXZRdWFhem1rUlJqZGZ0amRfWWlnRi1ZaW1ncDRFUXBONE92a0F2a1dGaXZUMThUeEFWZlJlRUdCTEtiZ0F3cFVLbWIzT3ZFcnFmWUNhbmhQY1NFWk4?oc=5",
+      "published": "Tue, 30 Sep 2025 07:00:00 GMT",
+      "published_iso": "2025-09-30T07:00:00+00:00",
+      "theme": "quantum_nextgen",
+      "impact_score": 9.8,
+      "probability_significant_impact": 0.9677,
+      "rationale": [
+        "quantum(+2.6)",
+        "battery(+1.8)",
+        "solid-state(+2.3)",
+        "production(+1.6)",
+        "commercial(+1.5)"
+      ],
+      "source": "https://news.google.com/rss/search?q=next%20generation%20battery%20commercialization&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "Railway secures $100 million to challenge AWS with AI-native cloud infrastructure",
+      "link": "https://venturebeat.com/infrastructure/railway-secures-usd100-million-to-challenge-aws-with-ai-native-cloud",
+      "published": "Thu, 22 Jan 2026 14:00:00 GMT",
+      "published_iso": "2026-01-22T14:00:00+00:00",
+      "theme": "ai_frontier",
+      "impact_score": 9.5,
+      "probability_significant_impact": 0.9627,
+      "rationale": [
+        "artificial intelligence(+3.0)",
+        "agentic(+2.5)",
+        "data center(+1.8)",
+        "hyperscaler(+1.6)",
+        "enterprise adoption(+2.0)",
+        "delay(-1.4)"
+      ],
+      "source": "https://venturebeat.com/category/ai/feed/"
+    },
+    {
+      "title": "Nous Research's NousCoder-14B is an open-source coding model landing right in the Claude Code moment",
+      "link": "https://venturebeat.com/technology/nous-researchs-nouscoder-14b-is-an-open-source-coding-model-landing-right-in",
+      "published": "Wed, 07 Jan 2026 20:00:00 GMT",
+      "published_iso": "2026-01-07T20:00:00+00:00",
+      "theme": "ai_frontier",
+      "impact_score": 9.1,
+      "probability_significant_impact": 0.9548,
+      "rationale": [
+        "artificial intelligence(+3.0)",
+        "agentic(+2.5)",
+        "gpu(+2.0)",
+        "inference(+1.6)"
+      ],
+      "source": "https://venturebeat.com/category/ai/feed/"
+    },
+    {
+      "title": "QuantumScape and PowerCo Expand Collaboration to Accelerate Solid-State Battery Technology Commercialization - Business Wire",
+      "link": "https://news.google.com/rss/articles/CBMi-AFBVV95cUxPRUwyemxsYlNUQl9KaVY5YWh0T1ljdTE1LVAzWTFqazlZODc3Q3ROVEhlQndQd1p3RjZGYUQzQkt2M3B2NFE1b2stZGZCbkc3b2pBTDBpVm56NXRxd0xKRHNZTjhRRGExMG9pSzBlczZ1Ym05N0p2dzhlMzZIa3dIS3ZlTFdnYW5YUnVXbmtHXzN5ai1vZzdvdEh2ekFuWnNfajJTUmh4dzZPYjM3WTllQlNmaDFxUzJ3a19weGhFLTFkck5tMXFYMWNGLW5GYUwtemxJakVEemNuWVlCTm5jSlVDYlV3WmVPRm1vdFE4dnNtSDlTOHlYMg?oc=5",
+      "published": "Wed, 23 Jul 2025 07:00:00 GMT",
+      "published_iso": "2025-07-23T07:00:00+00:00",
+      "theme": "quantum_nextgen",
+      "impact_score": 8.2,
+      "probability_significant_impact": 0.9309,
+      "rationale": [
+        "quantum(+2.6)",
+        "battery(+1.8)",
+        "solid-state(+2.3)",
+        "commercial(+1.5)"
+      ],
+      "source": "https://news.google.com/rss/search?q=next%20generation%20battery%20commercialization&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "After Huawei chip, the next Chinese semiconductor breakthrough will be harder - South China Morning Post",
+      "link": "https://news.google.com/rss/articles/CBMi5AFBVV95cUxPSllIZFEzNmZua1FYUElmajRPQkM5RXhKSW0zaGlNLW5MbkluYVFid2xGQWxPbjVQOXdHZEEwaEJLQlM0Qnh2aUF1dFdQWUdZR0FmekM5b0NyREgzSGZ6UzZoTmp2ZURXeXZkSHdHNmFrbWhFb0hZZjJUZk5zMG13bC0tQXF2UTlBd1picnJGRTFoOVJJRWs2N0pQQUJRUjNlMUR2MDlfSFVaejRMLS1feUFENTJvVlZNT09hZHRjdGpUTkkwaGJiampVRWx4ck1JRlVZd24yMG96eTE0UmZZbjAwSzHSAeQBQVVfeXFMUGxoR0EtUllpaFdhRFE2VjlfMGEwdnFQOWZlWVlaWXJBbjFwWnNkam1hZjNSMHc4eVlnam5Wa0xrWTRDZHZQeWxVM2V1YzBBbUgteldiNjBWZVlTN2JWc25iU3gyVnNQYjkwWmlTQWU4NE9VWTRCc2hFVDVNaXpwdDZJWTlpLVVKcXNBaEhRd2FMVVU0U1VKVXVCNE9LdEhqYUtUODNwQndtRm9CbFAtQklVejFXU0dNeVAtUkZvdXhzZWRjMkItTXZqMUt1RXhsYl9QV2hNWGIzTnN4aldiWlE3U1hN?oc=5",
+      "published": "Tue, 03 Oct 2023 07:00:00 GMT",
+      "published_iso": "2023-10-03T07:00:00+00:00",
+      "theme": "compute_semiconductor",
+      "impact_score": 7.8,
+      "probability_significant_impact": 0.9168,
+      "rationale": [
+        "semiconductor(+2.4)",
+        "chip(+1.7)",
+        "gpu(+2.0)",
+        "breakthrough(+1.7)"
+      ],
+      "source": "https://news.google.com/rss/search?q=semiconductor%20process%20breakthrough&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "Interview with Volvo autonomous trucks executive: \u2018We are already in commercial deployment\u2019 - Robotics & Automation News",
+      "link": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxPb3VCRThpZmdMUllBci1DbGllSVBBNFMzSERjQ1dwSVAzREtsOXdfdGFtQ19aTk5wSzlNZ05DSHR2OU5BR2ZoMzBILVVRVjk2NHJkc0VwR2NhMW54WEVxMWhHMzloR3pZcTF4YlpXOGNUYmYyOE1GbFZiMXc2bzl6d0JSaTBfRFdRN29nZVM5cklUenVMcGc5Q1I4a09aaHNaNWNmd0c0Yy11b0ZBVlI0dHRXSjJQQU1iY29CQy1PcTZyVE02YUk5ZnBRbDMyaVBZeE9MT3BNbmxHLXZC?oc=5",
+      "published": "Thu, 04 Dec 2025 08:00:00 GMT",
+      "published_iso": "2025-12-04T08:00:00+00:00",
+      "theme": "automation_robotics",
+      "impact_score": 7.6,
+      "probability_significant_impact": 0.9089,
+      "rationale": [
+        "robotics(+2.2)",
+        "automation(+1.9)",
+        "autonomous(+2.0)",
+        "commercial(+1.5)"
+      ],
+      "source": "https://news.google.com/rss/search?q=robotics%20autonomy%20industrial%20deployment&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "[News] China Makes Breakthrough in Chip Technology, Paving the Way for Lithography Advancements - TrendForce",
+      "link": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxQVUtVOVZVWU5JM01nenJsQUloUU1nczB2WmhoMnpNVG5jVlRjUDZwQ1BWYXZtMHdxaXZBOERqenVPV2ZLeVlPXzF5cHhNdTd4R05ia0NLRXlYYWVkVTFuVUFtdUFFR3RURW1rdm9jc1dWa2loQldsQjJvQnNkQWR3TU1kSWc1ajRLWmVzTjJFMXNyOUZ2WlBzS3VPRGpUQVVFNWJITUJaaDBwUnVkbll6UlphbG9BX2k1VUtJZERONUhSV0x3cnVJY1luM1BzekFabUE?oc=5",
+      "published": "Mon, 03 Nov 2025 08:00:00 GMT",
+      "published_iso": "2025-11-03T08:00:00+00:00",
+      "theme": "compute_semiconductor",
+      "impact_score": 7.6,
+      "probability_significant_impact": 0.9089,
+      "rationale": [
+        "chip(+1.7)",
+        "lithography(+2.2)",
+        "gpu(+2.0)",
+        "breakthrough(+1.7)"
+      ],
+      "source": "https://news.google.com/rss/search?q=semiconductor%20process%20breakthrough&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "LG Chem reveals solid-state battery breakthrough that enables commercialization - GlobalChinaEV",
+      "link": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOVFpTZklXZlV5U05pV0VRVmdZSVY1d3pkal9CbzJHUEFMY2JhbDM5V1lpVTZmUks2LWNWVk9WVXpqZkZlOTJDSUI3WnhmNzlLQ2JDdDB1Z3ltTWFaa1VvUTM1SzA3RUh2bV9aNDFBVFV5NDBIWGlHSDh4bmhKbG9nbTNETzdhM0tvcUJBb0x4SS1hQjhJSFp3ZHdud2FmZ19sWkRmVENNV3pSTk5JZTYw?oc=5",
+      "published": "Sat, 07 Mar 2026 09:09:45 GMT",
+      "published_iso": "2026-03-07T09:09:45+00:00",
+      "theme": "quantum_nextgen",
+      "impact_score": 7.3,
+      "probability_significant_impact": 0.8957,
+      "rationale": [
+        "battery(+1.8)",
+        "solid-state(+2.3)",
+        "commercial(+1.5)",
+        "breakthrough(+1.7)"
+      ],
+      "source": "https://news.google.com/rss/search?q=next%20generation%20battery%20commercialization&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "New European solid-state battery business targets commercial production - ESS News",
+      "link": "https://news.google.com/rss/articles/CBMirAFBVV95cUxOQzV5REpRb2E5SFIwczRDNHA5ZHlfNGQ1a3BCd2VSRGQ3UTR1c0x1ZmxzYUFvUE9FelVXVWdleEZ4QU5GRXJXa3M2Z3ZiMlNDZUgzV1ZpT0czM3lUTkVsU0VjNlNxbmE3bl9iT0Y5TFBzT25NRTl2TzVfYk1SSU9wZHk2dXBCSmV1aVFSMUxIMjVQUnNFXzZVY1dpUUhSVkdMcGYtZFpzMlhNMlB0?oc=5",
+      "published": "Wed, 07 Jan 2026 08:00:00 GMT",
+      "published_iso": "2026-01-07T08:00:00+00:00",
+      "theme": "quantum_nextgen",
+      "impact_score": 7.2,
+      "probability_significant_impact": 0.8909,
+      "rationale": [
+        "battery(+1.8)",
+        "solid-state(+2.3)",
+        "production(+1.6)",
+        "commercial(+1.5)"
+      ],
+      "source": "https://news.google.com/rss/search?q=next%20generation%20battery%20commercialization&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "Solid-State Battery Commercialization: Mass Production Taking Off - IDTechEx",
+      "link": "https://news.google.com/rss/articles/CBMitgFBVV95cUxPSVotc2FOeC1XaXhkUXNjb19aRmdMajFWRTY2MmgzNVZFY2VWUnlfV2lmQ3NhSWZNMzkwWnBQOTh1UWFXWGd1ZWtFWTZKblRaSHcteWo0bUlCOEN5Y2c5OHNaRjlMckFFcy1YYUpYNmpWZ0MyRWMtVEJONzc0U3R3NGtxX3ZKajB2NkFaMXRkb1puY0x4LTRtWTZiSEJMNl9tVDBqSXpoRHNNUmlaV3JOT1FLbk5NQQ?oc=5",
+      "published": "Mon, 07 Apr 2025 07:00:00 GMT",
+      "published_iso": "2025-04-07T07:00:00+00:00",
+      "theme": "quantum_nextgen",
+      "impact_score": 7.2,
+      "probability_significant_impact": 0.8909,
+      "rationale": [
+        "battery(+1.8)",
+        "solid-state(+2.3)",
+        "production(+1.6)",
+        "commercial(+1.5)"
+      ],
+      "source": "https://news.google.com/rss/search?q=next%20generation%20battery%20commercialization&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "title": "QuantumScape Updates Solid-State Battery Strategy - Battery Technology",
+      "link": "https://news.google.com/rss/articles/CBMi0wFBVV95cUxQdHdod2lCMi0yZk8tTVlZUHFILVlBVkUwOGdocUFjMUYxNnlRcDc3ZVk2d1FIeEgyUzl1Ym9DSTU3a3F2ekR4RHFiZ3EwVkdpTUVFdVp6X05YYTFHNUo2M2pMN2pTZl9tRW9lSXZJcmFCZ2dRWEthYS1ZY3RFQUNjUlF0YUp3Y3FnaFhWcV9fNTFYVTIwNHVqODVsel9neWlrSHo3UGJYUlU4eWFQVV9hdDl2aEcxV2JNQzJIcXFHLWIxM3Q3aTZOdU9qVUJRREhXX1ZZ?oc=5",
+      "published": "Thu, 19 Mar 2026 07:00:00 GMT",
+      "published_iso": "2026-03-19T07:00:00+00:00",
+      "theme": "quantum_nextgen",
+      "impact_score": 6.7,
+      "probability_significant_impact": 0.8641,
+      "rationale": [
+        "quantum(+2.6)",
+        "battery(+1.8)",
+        "solid-state(+2.3)"
+      ],
+      "source": "https://news.google.com/rss/search?q=next%20generation%20battery%20commercialization&hl=en-US&gl=US&ceid=US:en"
+    }
+  ]
+}

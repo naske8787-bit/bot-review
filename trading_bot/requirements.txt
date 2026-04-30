@@ -1,0 +1,12 @@
+requests
+pandas
+numpy
+scikit-learn
+tensorflow
+yfinance
+alpaca-py
+ta-lib
+matplotlib
+python-dotenv
+beautifulsoup4
+ib_insync

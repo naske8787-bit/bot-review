@@ -1,0 +1,13 @@
+{
+  "bots": {
+    "trading_bot": {
+      "last_drawdown": 0.0,
+      "last_portfolio_value": 100000.0,
+      "updated_at": 1777383214.6812773
+    }
+  },
+  "high_watermark": 100000.0,
+  "last_drawdown": 0.0,
+  "last_portfolio_value": 100000.0,
+  "updated_at": 1777383214.6813798
+}

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASX Bot Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1720;
+      --panel: #16212d;
+      --panel2: #1e2c3b;
+      --text: #e8f0f7;
+      --muted: #9cb3c9;
+      --up: #28c76f;
+      --down: #ea5455;
+      --accent: #3fa9f5;
+      --warn: #ffb703;
+      --border: #2f4255;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 18px;
+      background: radial-gradient(circle at top right, #1c2c3d 0, var(--bg) 40%);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.6rem;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .status-banner {
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--warn);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background: #1b2733;
+      color: var(--text);
+      font-size: 0.92rem;
+    }
+
+    .status-banner.good { border-left-color: var(--up); }
+    .status-banner.bad { border-left-color: var(--down); }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tab-btn {
+      background: #1b2733;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    .tab-btn.active {
+      color: var(--text);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(63, 169, 245, 0.3) inset;
+    }
+
+    .panel.hidden { display: none; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .metric { grid-column: span 3; min-height: 92px; }
+    .metric .label { color: var(--muted); font-size: 0.82rem; margin-bottom: 6px; }
+    .metric .value { font-size: 1.35rem; font-weight: 700; }
+
+    .wide { grid-column: span 8; }
+    .side { grid-column: span 4; }
+    .full { grid-column: span 12; }
+
+    canvas {
+      width: 100%;
+      height: 260px;
+      background: #101a24;
+      border-radius: 8px;
+      border: 1px solid #253648;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 8px 6px;
+      border-bottom: 1px solid #2a3b4d;
+    }
+
+    th { color: var(--muted); font-weight: 600; }
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .chat-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chat-log {
+      background: #101a24;
+      border: 1px solid #253648;
+      border-radius: 8px;
+      min-height: 180px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    .chat-msg {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+
+    .chat-msg.user {
+      background: rgba(63, 169, 245, 0.12);
+      border-color: rgba(63, 169, 245, 0.35);
+    }
+
+    .chat-msg.bot {
+      background: #162432;
+      border-color: #2b4258;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .chat-input-row textarea {
+      flex: 1;
+      min-height: 64px;
+      max-height: 140px;
+      resize: vertical;
+      background: #0f1821;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 0.92rem;
+    }
+
+    .chat-input-row button {
+      min-width: 100px;
+      border: 1px solid var(--accent);
+      color: #fff;
+      background: #1f4f73;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .chat-input-row button:hover {
+      background: #24628f;
+    }
+
+    @media (max-width: 1100px) {
+      .metric { grid-column: span 6; }
+      .wide, .side { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <h1>ASX Bot Performance Dashboard</h1>
+  <div class="subtitle" id="last-updated">Loading...</div>
+
+  <div class="status-banner" id="broker-banner">Checking broker status...</div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-paper" onclick="setTab('paper')">Paper Performance</button>
+    <button class="tab-btn" id="tab-ibkr" onclick="setTab('ibkr')">IBKR Readiness</button>
+  </div>
+
+  <div class="grid panel" id="panel-paper">
+    <div class="card metric"><div class="label">Current Equity</div><div class="value" id="equity">-</div></div>
+    <div class="card metric"><div class="label">Total PnL</div><div class="value" id="pnl">-</div></div>
+    <div class="card metric"><div class="label">Win Rate</div><div class="value" id="winrate">-</div></div>
+    <div class="card metric"><div class="label">Profit Factor</div><div class="value" id="pf">-</div></div>
+
+    <div class="card wide">
+      <div class="label" style="color:#9cb3c9;margin-bottom:8px;">Equity Curve</div>
+      <canvas id="equity-chart" width="1200" height="300"></canvas>
+    </div>
+
+    <div class="card side">
+      <div class="label" style="color:#9cb3c9;margin-bottom:8px;">Account Snapshot</div>
+      <table>
+        <tbody>
+          <tr><th>Initial Capital</th><td id="initial">-</td></tr>
+          <tr><th>Cash</th><td id="cash">-</td></tr>
+          <tr><th>Market Value</th><td id="mv">-</td></tr>
+          <tr><th>Realized PnL</th><td id="realized">-</td></tr>
+          <tr><th>Fees</th><td id="fees">-</td></tr>
+          <tr><th>Open Positions</th><td id="openpos">-</td></tr>
+          <tr><th>Closed Trades</th><td id="closed">-</td></tr>
+          <tr><th>Wins / Losses</th><td id="wl">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <div class="label" style="color:#9cb3c9;margin-bottom:8px;">Open Positions</div>
+      <table id="positions-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Qty</th>
+            <th>Avg Cost</th>
+            <th>Live Price</th>
+            <th>Market Value</th>
+            <th>Unrealized PnL</th>
+            <th>Stop</th>
+            <th>Target</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <div class="label" style="color:#9cb3c9;margin-bottom:8px;">Recent Trades (latest 200)</div>
+      <table id="trades-table">
+        <thead>
+          <tr>
+            <th>Time (UTC)</th>
+            <th>Symbol</th>
+            <th>Action</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Fee</th>
+            <th>PnL</th>
+            <th>Portfolio Value</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <div class="label" style="color:#9cb3c9;margin-bottom:8px;">Bot Copilot</div>
+      <div class="chat-wrap">
+        <div id="copilot-log" class="chat-log"></div>
+        <div class="chat-input-row">
+          <textarea id="copilot-input" placeholder="Ask: What has the bot learned? Which strategy rules are active? How can returns improve?"></textarea>
+          <button type="button" onclick="sendCopilotMessage()">Ask Bot</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid panel hidden" id="panel-ibkr">
+    <div class="card full">
+      <div class="label" style="color:#9cb3c9;margin-bottom:8px;">IBKR Connection Status</div>
+      <table>
+        <tbody>
+          <tr><th>Configured Mode</th><td id="ibkr-configured">-</td></tr>
+          <tr><th>Active Mode</th><td id="ibkr-active">-</td></tr>
+          <tr><th>Host / Port</th><td id="ibkr-hostport">-</td></tr>
+          <tr><th>Client ID</th><td id="ibkr-clientid">-</td></tr>
+          <tr><th>Connected</th><td id="ibkr-connected">-</td></tr>
+          <tr><th>Accounts</th><td id="ibkr-accounts">-</td></tr>
+          <tr><th>Fallback Allowed</th><td id="ibkr-fallback">-</td></tr>
+          <tr><th>Last Error</th><td id="ibkr-error">-</td></tr>
+          <tr><th>Checked At</th><td id="ibkr-checked">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <div class="label" style="color:#9cb3c9;margin-bottom:8px;">Readiness Checklist</div>
+      <table>
+        <tbody>
+          <tr><th>1</th><td>TWS or IB Gateway is running on the same host.</td></tr>
+          <tr><th>2</th><td>API is enabled and socket clients allowed.</td></tr>
+          <tr><th>3</th><td>Port matches env (`7497` paper, `7496` live).</td></tr>
+          <tr><th>4</th><td>Client ID is not already in use.</td></tr>
+          <tr><th>5</th><td>Set `BROKER_MODE=ibkr` in `asx_bot/.env`, restart bot.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let activeTab = "paper";
+
+    const fmtMoney = (n) => {
+      const v = Number(n || 0);
+      return "$" + v.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    };
+    const fmtPct = (n) => `${Number(n || 0).toFixed(2)}%`;
+
+    function valueClass(v) {
+      if (v > 0) return "up";
+      if (v < 0) return "down";
+      return "";
+    }
+
+    function drawEquityCurve(canvas, points) {
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      if (!points || points.length < 2) {
+        ctx.fillStyle = "#9cb3c9";
+        ctx.fillText("No trades yet", 20, 30);
+        return;
+      }
+
+      const vals = points.map(p => Number(p.equity || 0));
+      let minV = Math.min(...vals);
+      let maxV = Math.max(...vals);
+      if (minV === maxV) {
+        minV -= 1;
+        maxV += 1;
+      }
+
+      const pad = {left: 62, right: 18, top: 16, bottom: 34};
+      const iw = w - pad.left - pad.right;
+      const ih = h - pad.top - pad.bottom;
+
+      ctx.strokeStyle = "#2f4255";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = pad.top + ih * (i / 4);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(w - pad.right, y);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "#9cb3c9";
+      ctx.font = "12px Segoe UI";
+      for (let i = 0; i <= 4; i++) {
+        const v = maxV - (maxV - minV) * (i / 4);
+        const y = pad.top + ih * (i / 4);
+        ctx.fillText(fmtMoney(v), 8, y + 4);
+      }
+
+      const x = (i) => pad.left + (i / (points.length - 1)) * iw;
+      const y = (v) => pad.top + ((maxV - v) / (maxV - minV)) * ih;
+
+      ctx.strokeStyle = "#3fa9f5";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      points.forEach((p, i) => {
+        const px = x(i);
+        const py = y(Number(p.equity || 0));
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.stroke();
+
+      const last = Number(points[points.length - 1].equity || 0);
+      ctx.fillStyle = "#3fa9f5";
+      ctx.beginPath();
+      ctx.arc(x(points.length - 1), y(last), 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      const firstLabel = points[0].timestamp ? points[0].timestamp.slice(0, 16).replace("T", " ") : "start";
+      const lastLabel = points[points.length - 1].timestamp ? points[points.length - 1].timestamp.slice(0, 16).replace("T", " ") : "now";
+      ctx.fillStyle = "#9cb3c9";
+      ctx.fillText(firstLabel, pad.left, h - 10);
+      const tw = ctx.measureText(lastLabel).width;
+      ctx.fillText(lastLabel, w - pad.right - tw, h - 10);
+    }
+
+    function renderPositions(rows) {
+      const tbody = document.querySelector("#positions-table tbody");
+      tbody.innerHTML = "";
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color:#9cb3c9;">No open positions</td></tr>';
+        return;
+      }
+
+      rows.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="mono">${r.symbol}</td>
+          <td>${r.qty}</td>
+          <td>${fmtMoney(r.avg_cost)}</td>
+          <td>${fmtMoney(r.live_price)}</td>
+          <td>${fmtMoney(r.market_value)}</td>
+          <td class="${valueClass(r.unrealized_pnl)}">${fmtMoney(r.unrealized_pnl)}</td>
+          <td>${r.stop ? fmtMoney(r.stop) : "-"}</td>
+          <td>${r.target ? fmtMoney(r.target) : "-"}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderTrades(rows) {
+      const tbody = document.querySelector("#trades-table tbody");
+      tbody.innerHTML = "";
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color:#9cb3c9;">No trades yet</td></tr>';
+        return;
+      }
+
+      rows.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="mono">${(r.timestamp || "").replace("T", " ").slice(0, 19)}</td>
+          <td class="mono">${r.symbol || ""}</td>
+          <td class="${r.action === "BUY" ? "up" : "down"}">${r.action || ""}</td>
+          <td>${r.qty || 0}</td>
+          <td>${fmtMoney(r.price)}</td>
+          <td>${fmtMoney(r.brokerage)}</td>
+          <td class="${valueClass(r.pnl)}">${fmtMoney(r.pnl)}</td>
+          <td>${fmtMoney(r.portfolio_value)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function setTab(tab) {
+      activeTab = tab;
+      document.getElementById("panel-paper").classList.toggle("hidden", tab !== "paper");
+      document.getElementById("panel-ibkr").classList.toggle("hidden", tab !== "ibkr");
+      document.getElementById("tab-paper").classList.toggle("active", tab === "paper");
+      document.getElementById("tab-ibkr").classList.toggle("active", tab === "ibkr");
+    }
+
+    function renderBrokerStatus(status, overview) {
+      const configured = status.configured_mode || "paper";
+      const active = status.active_mode || "paper";
+      const ib = status.ibkr || {};
+
+      const banner = document.getElementById("broker-banner");
+      const usingIbkr = configured === "ibkr";
+      const connected = !!ib.connected;
+      banner.classList.remove("good", "bad");
+
+      if (!usingIbkr) {
+        banner.classList.add("good");
+        banner.textContent = "Running in paper mode. Performance metrics below are from local paper simulation logs.";
+      } else if (connected) {
+        banner.classList.add("good");
+        banner.textContent = "IBKR mode configured and reachable. You can now validate execution against IBKR paper account.";
+      } else {
+        banner.classList.add("bad");
+        const err = ib.error ? ` Error: ${ib.error}` : "";
+        banner.textContent = `IBKR mode configured but not connected.${err}`;
+      }
+
+      document.getElementById("ibkr-configured").textContent = configured;
+      document.getElementById("ibkr-active").textContent = active;
+      document.getElementById("ibkr-hostport").textContent = `${ib.host || "-"}:${ib.port || "-"}`;
+      document.getElementById("ibkr-clientid").textContent = ib.client_id ?? "-";
+      document.getElementById("ibkr-connected").textContent = connected ? "Yes" : "No";
+      document.getElementById("ibkr-connected").className = connected ? "up" : "down";
+      document.getElementById("ibkr-accounts").textContent = (ib.accounts || []).length ? ib.accounts.join(", ") : "-";
+      document.getElementById("ibkr-fallback").textContent = status.fallback_allowed ? "Yes" : "No";
+      document.getElementById("ibkr-error").textContent = ib.error || "-";
+      document.getElementById("ibkr-checked").textContent = (status.checked_at_utc || "").replace("T", " ").slice(0, 19) || "-";
+    }
+
+    function appendCopilotMessage(role, text) {
+      const log = document.getElementById("copilot-log");
+      const el = document.createElement("div");
+      el.className = `chat-msg ${role}`;
+      el.textContent = text;
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function sendCopilotMessage() {
+      const input = document.getElementById("copilot-input");
+      const message = (input.value || "").trim();
+      if (!message) return;
+
+      appendCopilotMessage("user", message);
+      input.value = "";
+
+      try {
+        const res = await fetch('/api/copilot-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          appendCopilotMessage("bot", `Error: ${data.error || 'Request failed'}`);
+          return;
+        }
+        appendCopilotMessage("bot", data.answer || "No response generated.");
+      } catch (err) {
+        appendCopilotMessage("bot", `Error talking to bot copilot: ${err}`);
+      }
+    }
+
+    async function refresh() {
+      try {
+        const [ovRes, trRes, stRes] = await Promise.all([
+          fetch('/api/overview'),
+          fetch('/api/trades'),
+          fetch('/api/broker-status')
+        ]);
+        const ov = await ovRes.json();
+        const trades = await trRes.json();
+        const status = await stRes.json();
+
+        document.getElementById("last-updated").textContent = `Last updated: ${(ov.last_updated_utc || "").replace("T", " ").slice(0, 19)} UTC`;
+
+        document.getElementById("equity").textContent = fmtMoney(ov.current_equity);
+
+        const pnlEl = document.getElementById("pnl");
+        pnlEl.textContent = `${fmtMoney(ov.total_pnl)} (${fmtPct(ov.total_pnl_pct)})`;
+        pnlEl.className = `value ${valueClass(ov.total_pnl)}`;
+
+        document.getElementById("winrate").textContent = fmtPct(ov.win_rate);
+        document.getElementById("pf").textContent = Number(ov.profit_factor || 0).toFixed(2);
+
+        document.getElementById("initial").textContent = fmtMoney(ov.initial_capital);
+        document.getElementById("cash").textContent = fmtMoney(ov.cash);
+        document.getElementById("mv").textContent = fmtMoney(ov.market_value);
+
+        const realizedEl = document.getElementById("realized");
+        realizedEl.textContent = fmtMoney(ov.realized_pnl);
+        realizedEl.className = valueClass(ov.realized_pnl);
+
+        const feesEl = document.getElementById("fees");
+        feesEl.textContent = fmtMoney(ov.total_fees);
+
+        document.getElementById("openpos").textContent = ov.open_positions;
+        document.getElementById("closed").textContent = ov.closed_trades;
+        document.getElementById("wl").textContent = `${ov.wins} / ${ov.losses}`;
+
+        drawEquityCurve(document.getElementById("equity-chart"), ov.equity_curve || []);
+        renderPositions(ov.positions || []);
+        renderTrades(trades || []);
+        renderBrokerStatus(status, ov);
+      } catch (err) {
+        document.getElementById("last-updated").textContent = "Dashboard API error: " + err;
+      }
+    }
+
+    refresh();
+    appendCopilotMessage(
+      "bot",
+      "Ask me what the bot has learned, which strategy signals it uses, or how returns are trending."
+    );
+    setInterval(refresh, 15000);
+  </script>
+</body>
+</html>

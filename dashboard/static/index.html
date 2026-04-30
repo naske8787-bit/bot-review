@@ -1,0 +1,2562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mining Production Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --surface2: #21262d;
+  --border:   #30363d;
+  --accent:   #1f6feb;
+  --accent2:  #388bfd;
+  --text:     #c9d1d9;
+  --muted:    #8b949e;
+  --success:  #3fb950;
+  --warning:  #d29922;
+  --danger:   #f85149;
+  --col-B: #388bfd;
+  --col-D: #3fb950;
+  --col-C: #f78166;
+  --col-A: #d2a8ff;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  flex-wrap: wrap;
+}
+.header h1 { font-size: 17px; font-weight: 700; color: #fff; white-space: nowrap; }
+
+/* ── Controls ── */
+.controls {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.controls-hidden { display: none !important; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 3px; }
+.tab {
+  padding: 5px 13px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.tab:hover { background: var(--border); color: var(--text); }
+.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tab.crew-B.active { background: var(--col-B); border-color: var(--col-B); }
+.tab.crew-D.active { background: #2d6a3f; border-color: var(--col-D); color: var(--col-D); }
+.tab.crew-C.active { background: #5c2b24; border-color: var(--col-C); color: var(--col-C); }
+.tab.crew-A.active { background: #3d2b5c; border-color: var(--col-A); color: var(--col-A); }
+.tab.tab-all.active { background: #2d3748; border-color: #718096; color: #cbd5e0; }
+
+/* ── Buttons ── */
+.btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: opacity 0.12s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-primary  { background: var(--accent); color: #fff; }
+.btn-success  { background: #238636; color: #fff; }
+.btn-ghost    { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+.btn-danger   { background: transparent; color: #f85149; border: 1px solid #f85149; }
+.btn-danger:hover { background: rgba(248,81,73,0.12); }
+.btn-xs { padding: 2px 7px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; }
+.btn-xs.edit { background: #1f6feb22; color: var(--accent2); }
+.btn-xs.edit:hover { background: #1f6feb44; }
+.btn-xs.del  { background: #f8514922; color: var(--danger); }
+.btn-xs.del:hover { background: #f8514944; }
+
+/* ── Main ── */
+.main { padding: 16px 20px; }
+
+/* ── View switching ── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Charts row ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.chart-card h4 {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* ── Rotation block ── */
+.rotation-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.rotation-header {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rotation-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rot-stats {
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.rot-stats span strong { color: var(--text); }
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+th {
+  background: var(--surface2);
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 7px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+th.left, td.left { text-align: left; }
+td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(48,54,61,0.5);
+  text-align: right;
+  color: var(--text);
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+tr.row-total td { background: var(--surface2); font-weight: 600; border-top: 1px solid var(--border); }
+tr.row-avg td { background: rgba(31,111,235,0.06); color: var(--muted); font-style: italic; }
+tr.row-ratio td { background: rgba(63,185,80,0.07); color: var(--success); font-weight: 600; }
+td .act { display: flex; gap: 3px; justify-content: flex-end; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.badge-full    { background: #3fb95022; color: var(--success); }
+.badge-partial { background: #d2992222; color: var(--warning); }
+
+/* ── Empty / loading ── */
+.empty-state { text-align: center; padding: 50px 20px; color: var(--muted); }
+.empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+.empty-state p { font-size: 13px; line-height: 1.6; }
+.loading { text-align: center; padding: 36px; color: var(--muted); }
+
+/* ── Modal overlay ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal h2 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 18px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full { grid-column: 1 / -1; }
+label { font-size: 11px; color: var(--muted); font-weight: 500; }
+input, select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 9px;
+  font-size: 12px;
+  width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+/* ── Fault entry table ── */
+.fault-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.fault-entry-header label { font-size: 12px; color: var(--text); }
+.ftable { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+.ftable th { font-size: 11px; color: var(--muted); text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+.ftable td { padding: 3px 4px; }
+.ftable input { padding: 5px 7px; }
+.ftable .rm { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* ── All-crews summary table ── */
+.all-crews-section { margin-bottom: 14px; }
+.all-crews-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.crew-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.cp-B { background: #1f6feb22; color: var(--col-B); }
+.cp-D { background: #3fb95022; color: var(--col-D); }
+.cp-C { background: #f7816622; color: var(--col-C); }
+.cp-A { background: #d2a8ff22; color: var(--col-A); }
+
+/* ── Combined cards ── */
+.combined-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.machine-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.machine-card h3 {
+  font-size: 14px; font-weight: 700; color: #fff;
+  margin-bottom: 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+.stat-label { color: var(--muted); font-size: 12px; }
+.stat-value { font-weight: 600; font-size: 13px; }
+.site-total-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.site-total-card h3 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+.site-total-values { display: flex; gap: 32px; flex-wrap: wrap; }
+.site-stat { display: flex; flex-direction: column; gap: 2px; }
+.site-stat .lbl { font-size: 11px; color: var(--muted); }
+.site-stat .val { font-size: 20px; font-weight: 700; color: var(--success); }
+
+@media (max-width: 768px) {
+  .charts-row { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .rot-stats { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<div class="header">
+  <h1>⛏ Mining Production</h1>
+  <div class="tabs" id="machineTabs">
+    <button class="tab active" onclick="selectMachine('CM02')">CM02</button>
+    <button class="tab" onclick="selectMachine('CM03')">CM03</button>
+    <button class="tab" onclick="selectMachine('CM05')">CM05</button>
+    <button class="tab" onclick="selectMachine('CM07')">CM07</button>
+    <button class="tab" onclick="selectMachine('CM08')">CM08</button>
+    <button class="tab" onclick="selectMachine('CM09')">CM09</button>
+    <button class="tab" onclick="selectMachine('COMBINED')" style="margin-left:8px">📊 Combined</button>
+  </div>
+</div>
+
+<!-- ── Per-machine controls ───────────────────────────────────────────── -->
+<div class="controls" id="controls">
+  <div class="tabs" id="crewTabs">
+    <button class="tab crew-B active" onclick="selectCrew('B')">B Crew</button>
+    <button class="tab crew-D" onclick="selectCrew('D')">D Crew</button>
+    <button class="tab crew-C" onclick="selectCrew('C')">C Crew</button>
+    <button class="tab crew-A" onclick="selectCrew('A')">A Crew</button>
+    <button class="tab tab-all" onclick="selectCrew('ALL')" style="margin-left:6px">↕ All Crews</button>
+  </div>
+  <div class="edit-controls">
+  <button class="btn btn-success" onclick="openModal()">＋ Add Shift</button>
+  <button class="btn btn-ghost" onclick="openImportModal()" title="Import a timestamped fault log CSV">📥 Import Fault Log</button>
+  <button class="btn btn-ghost" id="btnImportExcel" onclick="importFromExcel()" title="Import all shifts &amp; faults from Faults vs Tons 2026.xlsx">📊 Import Excel</button>
+  <button class="btn btn-danger" onclick="clearCrewData()" title="Delete all shifts &amp; faults for this machine + crew">🗑 Clear Crew Data</button>
+  </div>
+  <button class="btn btn-ghost" id="btnShareLink" onclick="copyShareLink()" title="Copy read-only share link to clipboard" style="margin-left:8px">🔗 Share View</button>
+  <span id="shiftCount" style="font-size:11px;color:var(--muted)"></span>
+</div>
+
+<!-- ── Main views ──────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <div class="chart-card" id="investmentCard" style="margin-bottom:12px">
+    <h4>Investment Performance (Trading + Crypto)</h4>
+    <canvas id="chartInvestments" height="100"></canvas>
+    <p id="investmentMeta" style="margin-top:8px;color:var(--muted);font-size:12px">Loading investment history…</p>
+  </div>
+
+  <!-- Crypto Influencer Monitor panel -->
+  <div class="chart-card" id="influencerCard" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h4 style="margin:0">🔬 Crypto Influencer Manipulation Monitor</h4>
+      <button onclick="loadInfluencerData()" style="font-size:11px;padding:3px 10px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer">Refresh</button>
+    </div>
+
+    <!-- Global signal banner -->
+    <div id="infGlobalBanner" style="padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:13px;background:#161b22;border:1px solid var(--border)">
+      Loading influencer signals…
+    </div>
+
+    <!-- Per-symbol grid -->
+    <div id="infSymbolGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:12px"></div>
+
+    <!-- Pump-ride trades table -->
+    <div id="infPumpTradesSection" style="display:none">
+      <h5 style="color:var(--muted);font-size:12px;margin:8px 0 4px">Pump-Ride Trades (influencer-triggered)</h5>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px" id="infPumpTradesTable">
+          <thead>
+            <tr style="color:var(--muted);border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:4px 8px">Symbol</th>
+              <th style="text-align:left;padding:4px 8px">Entry</th>
+              <th style="text-align:left;padding:4px 8px">Exit</th>
+              <th style="text-align:right;padding:4px 8px">PnL</th>
+              <th style="text-align:left;padding:4px 8px">Actors</th>
+            </tr>
+          </thead>
+          <tbody id="infPumpTradesTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Research headlines -->
+    <div id="infResearchSection" style="display:none;margin-top:10px">
+      <h5 style="color:var(--muted);font-size:12px;margin:4px 0">Tech Research Headlines (high probability)</h5>
+      <ul id="infResearchList" style="list-style:none;padding:0;margin:0;font-size:12px"></ul>
+    </div>
+
+    <p id="infMeta" style="color:var(--muted);font-size:11px;margin-top:8px"></p>
+  </div>
+
+  <!-- Single-crew rotation view -->
+  <div class="view active" id="viewSingleCrew">
+    <div id="chartsArea" style="display:none">
+      <div class="charts-row">
+        <div class="chart-card">
+          <h4>Total Tons per Rotation</h4>
+          <canvas id="chartTons" height="120"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Cumulative Tons (running total)</h4>
+          <canvas id="chartCumulative" height="120"></canvas>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h4>Avg Tons / Fault per Rotation</h4>
+          <canvas id="chartTpf" height="120"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Cumulative Avg Tons / Fault</h4>
+          <canvas id="chartWeekly" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+    <div id="rotationsContainer"></div>
+  </div>
+
+  <!-- All-crews per-machine view -->
+  <div class="view" id="viewAllCrews">
+    <div id="allCrewsContainer"></div>
+  </div>
+
+  <!-- Combined view -->
+  <div class="view" id="viewCombined">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="printReport()" title="Open printable report in new tab">🖨 Print Report</button>
+      <button class="btn btn-ghost" onclick="emailReport()" title="Open email client with plain-text report">✉ Email Report</button>
+      <button class="btn btn-ghost" onclick="exportSnapshot()" title="Download self-contained HTML file — works offline, email as attachment">📦 Export Snapshot</button>
+      <button class="btn btn-ghost" onclick="exportSnapshot(true)" title="Open print dialog — choose 'Save as PDF' in your browser">📄 Download PDF</button>
+    </div>
+    <div id="combinedContainer"><div class="loading">Loading…</div></div>
+  </div>
+
+</div>
+
+<!-- ── Add / Edit Shift Modal ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Shift</h2>
+    <input type="hidden" id="editId">
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Machine</label>
+        <select id="fMachine">
+          <option>CM02</option><option>CM03</option><option>CM05</option>
+          <option>CM07</option><option>CM08</option><option>CM09</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Crew</label>
+        <select id="fCrew">
+          <option value="B">B Crew</option>
+          <option value="D">D Crew</option>
+          <option value="C">C Crew</option>
+          <option value="A">A Crew</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="form-group">
+        <label>Shift</label>
+        <select id="fShift">
+          <option value="DS">DS — Day Shift</option>
+          <option value="NS">NS — Night Shift</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Tons Cut</label>
+        <input type="number" id="fTons" placeholder="0.0" step="0.1" min="0">
+      </div>
+    </div>
+
+    <div class="fault-entry-header">
+      <label>Faults (fault code + count)</label>
+      <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px" onclick="addFaultRow()">＋ Add Fault</button>
+    </div>
+    <table class="ftable">
+      <thead>
+        <tr>
+          <th>Fault Code</th>
+          <th style="width:90px">Count</th>
+          <th style="width:30px"></th>
+        </tr>
+      </thead>
+      <tbody id="faultBody"></tbody>
+    </table>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-ghost" id="btnSaveContinue" onclick="saveShift(true)" style="border-color:var(--accent2);color:var(--accent2)">💾 Save &amp; Next</button>
+      <button class="btn btn-success" onclick="saveShift(false)">✔ Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// Read-only mode (injected by server for /view/<token> links)
+// ═══════════════════════════════════════════════════════════════════════
+const READONLY = window.READONLY === true;
+const _WRITE_TOKEN = window._WRITE_TOKEN || null;
+
+function _writeHeaders() {
+  // Attach write-auth header so the backend accepts write requests from owner
+  return _WRITE_TOKEN ? { 'Content-Type': 'application/json', 'X-Write-Auth': _WRITE_TOKEN } : { 'Content-Type': 'application/json' };
+}
+
+function _applyReadonly() {
+  if (!READONLY) return;
+  // Hide all edit controls
+  document.querySelectorAll('.edit-controls, #btnShareLink').forEach(el => el.style.display = 'none');
+  // Add a subtle banner
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:#1a2a1a;color:#3fb950;text-align:center;padding:6px 12px;font-size:12px;border-bottom:1px solid #238636;';
+  banner.textContent = '👁 View-only mode — data cannot be modified';
+  document.body.insertBefore(banner, document.body.firstChild);
+}
+
+async function copyShareLink() {
+  try {
+    const r = await fetch('/api/share-link', { headers: { 'X-Write-Auth': _WRITE_TOKEN } });
+    const d = await r.json();
+    await navigator.clipboard.writeText(d.url);
+    const btn = document.getElementById('btnShareLink');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  } catch {
+    alert('Could not copy link. Check console for share URL.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════════
+const S = {
+  machine:    'CM02',
+  crew:       'B',
+  rotations:  [],
+  faultCodes: ['M1441','M1443','M1447','M1448','M1450','M1452','M1454','M1456','M1458','M1461','M1463'],
+  charts:     {},
+};
+
+const MACHINES = ['CM02','CM03','CM05','CM07','CM08','CM09'];
+const CREWS    = ['B','D','C','A'];
+const CREW_COLORS = { B:'#388bfd', D:'#3fb950', C:'#f78166', A:'#d2a8ff' };
+
+// ═══════════════════════════════════════════════════════════════════════
+// Navigation
+// ═══════════════════════════════════════════════════════════════════════
+function selectMachine(m) {
+  S.machine = m;
+  document.querySelectorAll('#machineTabs .tab').forEach((t, i) => {
+    const names = [...MACHINES, 'COMBINED'];
+    t.classList.toggle('active', names[i] === m);
+  });
+  if (m === 'COMBINED') {
+    document.getElementById('controls').classList.add('controls-hidden');
+    showView('viewCombined');
+    loadCombined();
+  } else {
+    document.getElementById('controls').classList.remove('controls-hidden');
+    if (S.crew === 'ALL') {
+      showView('viewAllCrews');
+      loadAllCrews();
+    } else {
+      showView('viewSingleCrew');
+      loadShifts();
+    }
+  }
+}
+
+function selectCrew(c) {
+  S.crew = c;
+  document.querySelectorAll('#crewTabs .tab').forEach(t => {
+    const isCrew = ['B','D','C','A'].includes(t.textContent.trim()[0]);
+    const label  = t.textContent.trim();
+    const matches = (c === 'ALL' && label.includes('All')) ||
+                    (c !== 'ALL' && label.startsWith(c + ' '));
+    t.classList.toggle('active', matches);
+  });
+  if (c === 'ALL') {
+    showView('viewAllCrews');
+    loadAllCrews();
+  } else {
+    showView('viewSingleCrew');
+    loadShifts();
+  }
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Load: single-crew rotation data
+// ═══════════════════════════════════════════════════════════════════════
+async function loadShifts() {
+  setContainer('rotationsContainer', '<div class="loading">Loading…</div>');
+  try {
+    const r    = await fetch(`/api/shifts?machine=${S.machine}&crew=${S.crew}`);
+    const data = await r.json();
+    S.rotations  = data.rotations  || [];
+    S.faultCodes = data.fault_codes || [];
+    const n = data.total_shifts || 0;
+    document.getElementById('shiftCount').textContent =
+      n > 0 ? `${n} shift${n !== 1 ? 's' : ''} logged` : '';
+    renderRotations();
+    renderCharts();
+  } catch(e) {
+    setContainer('rotationsContainer', `<div class="empty-state"><p>Error: ${e.message}</p></div>`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Load: all crews for this machine
+// ═══════════════════════════════════════════════════════════════════════
+async function loadAllCrews() {
+  setContainer('allCrewsContainer', '<div class="loading">Loading…</div>');
+  try {
+    const r    = await fetch(`/api/machine-summary?machine=${S.machine}`);
+    const data = await r.json();
+    renderAllCrews(data);
+  } catch(e) {
+    setContainer('allCrewsContainer', `<div class="empty-state"><p>Error: ${e.message}</p></div>`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Load: site-wide combined
+// ═══════════════════════════════════════════════════════════════════════
+let _lastCombinedData = null;
+async function loadCombined() {
+  setContainer('combinedContainer', '<div class="loading">Loading…</div>');
+  loadInvestmentPerformance();
+  try {
+    const r    = await fetch('/api/combined');
+    const data = await r.json();
+    _lastCombinedData = data;
+    renderCombined(data);
+  } catch(e) {
+    setContainer('combinedContainer', `<div class="empty-state"><p>Error: ${e.message}</p></div>`);
+  }
+}
+
+async function loadInvestmentPerformance() {
+  const metaEl = document.getElementById('investmentMeta');
+  const canvas = document.getElementById('chartInvestments');
+  if (!metaEl || !canvas) return;
+
+  metaEl.textContent = 'Loading investment history…';
+  try {
+    const r = await fetch('/api/investment-performance?points=240');
+    if (!r.ok) throw new Error(r.statusText);
+    const data = await r.json();
+
+    const portfolio = data.portfolio || [];
+    const cash = data.cash || [];
+    const buyingPower = data.buying_power || [];
+    const latest = data.latest || {};
+
+    if (!portfolio.length) {
+      metaEl.textContent = 'No trading equity data found yet. Once bots log equity snapshots, the chart will appear here.';
+      if (S.charts.investment) {
+        S.charts.investment.destroy();
+        delete S.charts.investment;
+      }
+      return;
+    }
+
+    const labels = portfolio.map(p => {
+      const d = new Date(p.t);
+      if (Number.isNaN(d.getTime())) return p.t;
+      return `${d.toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
+    });
+    const portfolioVals = portfolio.map(p => p.v);
+    const cashVals = cash.map(p => p.v);
+    const buyingPowerVals = buyingPower.map(p => p.v);
+
+    if (S.charts.investment) {
+      S.charts.investment.destroy();
+      delete S.charts.investment;
+    }
+
+    S.charts.investment = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Portfolio Value (USD)',
+            data: portfolioVals,
+            borderColor: '#3fb950',
+            backgroundColor: '#3fb95022',
+            borderWidth: 2,
+            pointRadius: 1.8,
+            pointHoverRadius: 4,
+            tension: 0.25,
+            fill: true,
+          },
+          {
+            label: 'Cash Balance (USD)',
+            data: cashVals,
+            borderColor: '#1f6feb',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 1.8,
+            pointHoverRadius: 4,
+            tension: 0.25,
+            fill: false,
+          },
+          {
+            label: 'Buying Power (USD)',
+            data: buyingPowerVals,
+            borderColor: '#d29922',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 1.8,
+            pointHoverRadius: 4,
+            tension: 0.25,
+            fill: false,
+          },
+        ]
+      },
+      options: {
+        ...chartOpts(),
+        plugins: {
+          legend: {
+            display: true,
+            labels: { color: '#8b949e', font: { size: 11 }, boxWidth: 12 }
+          }
+        },
+        scales: {
+          ...chartOpts().scales,
+          y: {
+            ...chartOpts().scales.y,
+            ticks: {
+              ...chartOpts().scales.y.ticks,
+              callback: (v) => `$${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+            }
+          }
+        }
+      }
+    });
+
+    const toMoney = (v) => `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const pct = Number(latest.window_pct_change || 0);
+    const pctText = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    const pnlColor = pct >= 0 ? 'var(--success)' : 'var(--danger)';
+    metaEl.innerHTML =
+      `Latest portfolio: <strong>${toMoney(latest.portfolio_value)}</strong> · ` +
+      `Cash: <strong>${toMoney(latest.cash_balance)}</strong> · ` +
+      `Buying power: <strong>${toMoney(latest.buying_power)}</strong> · ` +
+      `Window change: <strong style="color:${pnlColor}">${toMoney(latest.window_net_change)} (${pctText})</strong> · ` +
+      `Crypto realized PnL: <strong>${toMoney(latest.crypto_cum_realized_pnl)}</strong>`;
+  } catch (e) {
+    metaEl.textContent = `Could not load investment chart: ${e.message}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Render: single-crew rotations
+// ═══════════════════════════════════════════════════════════════════════
+function renderRotations() {
+  const rots  = S.rotations;
+  const codes = S.faultCodes;
+
+  if (!rots.length) {
+    setContainer('rotationsContainer', `
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>No shifts entered for <strong>${S.machine} — ${S.crew} Crew</strong>.<br>
+           Click <strong>＋ Add Shift</strong> to begin entering data from 2026-01-01.</p>
+      </div>`);
+    document.getElementById('chartsArea').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('chartsArea').style.display = '';
+
+  let html = '';
+  for (const rot of rots) {
+    const badge = rot.complete
+      ? `<span class="badge badge-full">7 shifts</span>`
+      : `<span class="badge badge-partial">${rot.shifts.length}/7</span>`;
+    const dates = rot.shifts.length
+      ? `${rot.shifts[0].date} → ${rot.shifts[rot.shifts.length-1].date}`
+      : '';
+
+    html += `
+    <div class="rotation-block">
+      <div class="rotation-header" onclick="toggleRot(this)">
+        <h3>Rotation ${rot.rotation} ${badge}
+          <span style="font-weight:400;color:var(--muted);font-size:11px">${dates}</span>
+        </h3>
+        <div class="rot-stats">
+          <span>Total Tons: <strong>${n1(rot.total_tons)}</strong></span>
+          <span>Avg/Shift: <strong>${n1(rot.avg_tons)}</strong></span>
+          <span>Total Faults: <strong>${rot.total_faults}</strong></span>
+          <span>Tons/Fault: <strong>${n1(rot.tons_per_fault)}</strong></span>
+        </div>
+      </div>
+      <div class="rotation-body">
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th class="left">Date</th>
+            <th class="left">Shift</th>
+            <th>Tons</th>
+            ${codes.map(c => `<th title="${c}">${abbr(c)}</th>`).join('')}
+            <th>Tot. Faults</th>
+            <th></th>
+          </tr></thead>
+          <tbody>`;
+
+    for (const s of rot.shifts) {
+      html += `<tr>
+        <td class="left">${s.date}</td>
+        <td class="left">${s.shift}</td>
+        <td>${n1(s.tons)}</td>
+        ${codes.map(c => `<td>${s.faults[c] != null ? s.faults[c] : '–'}</td>`).join('')}
+        <td><strong>${s.total_faults}</strong></td>
+        <td><div class="act">
+          <button class="btn-xs edit" onclick="editShift(${s.id})">Edit</button>
+          <button class="btn-xs del"  onclick="delShift(${s.id})">✕</button>
+        </div></td>
+      </tr>`;
+    }
+
+    // Total / Average / Tons-per-Fault rows
+    const ft = rot.fault_totals;
+    const n  = rot.shifts.length;
+    html += `
+      <tr class="row-total">
+        <td class="left" colspan="2">TOTAL (${n} shifts)</td>
+        <td>${n1(rot.total_tons)}</td>
+        ${codes.map(c => `<td>${ft[c] || '—'}</td>`).join('')}
+        <td>${rot.total_faults}</td><td></td>
+      </tr>
+      <tr class="row-avg">
+        <td class="left" colspan="2">AVERAGE / shift</td>
+        <td>${n1(rot.avg_tons)}</td>
+        ${codes.map(c => `<td>${n2((ft[c]||0)/n)}</td>`).join('')}
+        <td>${n2(rot.avg_faults)}</td><td></td>
+      </tr>
+      <tr class="row-ratio">
+        <td class="left" colspan="2">TONS / FAULT</td>
+        <td colspan="${codes.length + 2}">${rot.total_faults > 0 ? n1(rot.tons_per_fault) : '—'}</td>
+        <td></td>
+      </tr>`;
+
+    html += `</tbody></table></div></div></div>`;
+  }
+
+  document.getElementById('rotationsContainer').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Render: all-crews per-machine summary
+// ═══════════════════════════════════════════════════════════════════════
+function renderAllCrews(data) {
+  const maxRots = Math.max(...CREWS.map(c => (data[c]||[]).length), 0);
+  if (!maxRots) {
+    setContainer('allCrewsContainer', `
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>No data yet for <strong>${S.machine}</strong>.</p>
+      </div>`);
+    return;
+  }
+
+  // Summary cards per crew
+  let cards = '<div class="combined-grid" style="margin-bottom:16px">';
+  for (const crew of CREWS) {
+    const rots = data[crew] || [];
+    const tt   = rots.reduce((s,r) => s+r.total_tons, 0);
+    const tf   = rots.reduce((s,r) => s+r.total_faults, 0);
+    cards += `
+    <div class="machine-card">
+      <h3><span class="crew-pill cp-${crew}">${crew}</span> Crew — ${S.machine}</h3>
+      <div class="stat-row"><span class="stat-label">Total Tons</span>
+        <span class="stat-value" style="color:var(--col-${crew})">${n1(tt)}</span></div>
+      <div class="stat-row"><span class="stat-label">Total Faults</span>
+        <span class="stat-value">${tf}</span></div>
+      <div class="stat-row"><span class="stat-label">Tons / Fault</span>
+        <span class="stat-value">${tf>0?n1(tt/tf):'—'}</span></div>
+      <div class="stat-row"><span class="stat-label">Rotations logged</span>
+        <span class="stat-value">${rots.length}</span></div>
+    </div>`;
+  }
+  cards += '</div>';
+
+  // Per-rotation comparison table
+  let tbl = `
+  <div class="rotation-block">
+    <div class="rotation-header" style="cursor:default">
+      <h3>Per-Rotation Comparison — All Crews</h3>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th class="left">Rotation</th>
+        ${CREWS.map(c=>`<th><span class="crew-pill cp-${c}">${c}</span> Tons</th>
+          <th><span class="crew-pill cp-${c}">${c}</span> T/F</th>`).join('')}
+        <th>Machine Total</th>
+      </tr></thead><tbody>`;
+
+  let grandTons = 0, grandFaults = 0;
+  for (let i = 0; i < maxRots; i++) {
+    let rowTons = 0, rowFaults = 0;
+    let cells = '';
+    for (const crew of CREWS) {
+      const rot = (data[crew]||[])[i];
+      if (rot) {
+        cells += `<td>${n1(rot.total_tons)}</td><td>${n1(rot.tons_per_fault)}</td>`;
+        rowTons   += rot.total_tons;
+        rowFaults += rot.total_faults;
+      } else {
+        cells += `<td>—</td><td>—</td>`;
+      }
+    }
+    grandTons   += rowTons;
+    grandFaults += rowFaults;
+    tbl += `<tr><td class="left"><strong>R${i+1}</strong></td>${cells}
+      <td><strong>${n1(rowTons)}</strong></td></tr>`;
+  }
+
+  tbl += `
+    <tr class="row-total">
+      <td class="left">TOTAL</td>
+      ${CREWS.map(c => {
+        const rots = data[c] || [];
+        const tt = rots.reduce((s,r)=>s+r.total_tons,0);
+        const tf = rots.reduce((s,r)=>s+r.total_faults,0);
+        return `<td>${n1(tt)}</td><td>${tf>0?n1(tt/tf):'—'}</td>`;
+      }).join('')}
+      <td><strong>${n1(grandTons)}</strong></td>
+    </tr>
+  </tbody></table></div></div>`;
+
+  // Single line chart for selected machine — one line per crew
+  const chartsHtml = `
+  <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="chart-card">
+      <h4>Coal Mined per Rotation — ${S.machine}</h4>
+      <canvas id="chartAllCrewsLine" height="110"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>Tons / Fault per Rotation — ${S.machine}</h4>
+      <canvas id="chartAllCrewsTF" height="110"></canvas>
+    </div>
+  </div>`;
+
+  setContainer('allCrewsContainer', cards + tbl + chartsHtml);
+
+  const labels = Array.from({length: maxRots}, (_,i) => `R${i+1}`);
+  const legendOpts = { display: true, labels: { color: '#8b949e', font: { size: 11 }, boxWidth: 12 } };
+
+  new Chart(document.getElementById('chartAllCrewsLine'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: CREWS.map(crew => ({
+        label: crew + ' Crew',
+        data: Array.from({length: maxRots}, (_,i) => (data[crew]||[])[i]?.total_tons ?? null),
+        borderColor:     CREW_COLORS[crew],
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        borderWidth: 2,
+        spanGaps: false,
+      }))
+    },
+    options: { ...chartOpts(), plugins: { legend: legendOpts } }
+  });
+
+  new Chart(document.getElementById('chartAllCrewsTF'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: CREWS.map(crew => {
+        const rots = Array.from({length: maxRots}, (_,i) => (data[crew]||[])[i] || null);
+        return {
+          label: crew + ' Crew',
+          // zero-fault rotations → y=0 (shown as gold star); faults>0 → ratio; no data → null
+          data: rots.map(rot => {
+            if (!rot) return null;
+            if (rot.total_faults === 0 && rot.total_tons > 0) return 0;
+            if (rot.total_faults > 0) return rot.tons_per_fault;
+            return null;
+          }),
+          borderColor:     CREW_COLORS[crew],
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          spanGaps: true,
+          // per-point styling: gold star where zero faults
+          pointStyle:           rots.map(rot => (rot && rot.total_faults === 0 && rot.total_tons > 0) ? 'star'    : 'circle'),
+          pointRadius:          rots.map(rot => (rot && rot.total_faults === 0 && rot.total_tons > 0) ? 9         : 4),
+          pointHoverRadius:     rots.map(rot => (rot && rot.total_faults === 0 && rot.total_tons > 0) ? 11        : 6),
+          pointBackgroundColor: rots.map(rot => (rot && rot.total_faults === 0 && rot.total_tons > 0) ? '#ffd700' : CREW_COLORS[crew]),
+          pointBorderColor:     rots.map(rot => (rot && rot.total_faults === 0 && rot.total_tons > 0) ? '#b8860b' : CREW_COLORS[crew]),
+        };
+      })
+    },
+    options: {
+      ...chartOpts(),
+      scales: { ...chartOpts().scales, y: { ...chartOpts().scales.y, min: 0 } },
+      plugins: {
+        legend: legendOpts,
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const crew = ctx.dataset.label.split(' ')[0];
+              const rot = (data[crew]||[])[ctx.dataIndex];
+              if (rot && rot.total_faults === 0 && rot.total_tons > 0)
+                return `${ctx.dataset.label}: ★ No faults — ${n1(rot.total_tons)} t mined`;
+              return `${ctx.dataset.label}: ${ctx.formattedValue} t/f`;
+            }
+          }
+        }
+      }
+    }
+  });
+  // legend note for the star marker
+  document.getElementById('chartAllCrewsTF').parentElement.insertAdjacentHTML(
+    'beforeend',
+    '<p style="font-size:11px;color:#8b949e;margin:4px 0 0;text-align:center">★ Gold star = zero faults recorded (rotation placed at y=0)</p>'
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Render: combined all-machines
+// ═══════════════════════════════════════════════════════════════════════
+function renderCombined(data) {
+  // Per-machine cards
+  let html = '<div class="combined-grid">';
+  let siteTons = 0, siteFaults = 0;
+
+  for (const machine of MACHINES) {
+    const md = data[machine] || {};
+    let mTons = 0, mFaults = 0;
+    const crewRows = CREWS.map(crew => {
+      const rots = md[crew] || [];
+      const tt = rots.reduce((s,r)=>s+r.tt, 0);
+      const tf = rots.reduce((s,r)=>s+r.tf, 0);
+      mTons += tt; mFaults += tf;
+      return `<div class="stat-row">
+        <span class="stat-label"><span class="crew-pill cp-${crew}">${crew}</span></span>
+        <span class="stat-value">${n1(tt)} t &nbsp; <small style="color:var(--muted);font-weight:400">${tf>0?n1(tt/tf)+' t/f':'–'}</small></span>
+      </div>`;
+    }).join('');
+    siteTons += mTons; siteFaults += mFaults;
+    html += `
+    <div class="machine-card">
+      <h3>${machine}
+        <span style="font-size:11px;font-weight:400;color:var(--success);margin-left:6px">${n1(mTons)} t total</span>
+      </h3>
+      ${crewRows}
+      ${mFaults>0?`<div class="stat-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+        <span class="stat-label">Machine Tons/Fault</span>
+        <span class="stat-value">${n1(mTons/mFaults)}</span>
+      </div>`:''}
+    </div>`;
+  }
+  html += '</div>';
+
+  // Per-crew combined (all machines)
+  html += '<div class="combined-grid">';
+  for (const crew of CREWS) {
+    let crewTons = 0, crewFaults = 0;
+    for (const m of MACHINES) {
+      const rots = (data[m]||{})[crew] || [];
+      crewTons   += rots.reduce((s,r)=>s+r.tt,0);
+      crewFaults += rots.reduce((s,r)=>s+r.tf,0);
+    }
+    html += `
+    <div class="machine-card" style="border-left: 3px solid ${CREW_COLORS[crew]}">
+      <h3><span class="crew-pill cp-${crew}">${crew} Crew</span> — All Machines</h3>
+      <div class="stat-row"><span class="stat-label">Total Tons</span>
+        <span class="stat-value" style="color:${CREW_COLORS[crew]}">${n1(crewTons)}</span></div>
+      <div class="stat-row"><span class="stat-label">Total Faults</span>
+        <span class="stat-value">${crewFaults}</span></div>
+      <div class="stat-row"><span class="stat-label">Tons / Fault</span>
+        <span class="stat-value">${crewFaults>0?n1(crewTons/crewFaults):'—'}</span></div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // Site total
+  html += `
+  <div class="site-total-card">
+    <h3>📊 Site Total</h3>
+    <div class="site-total-values">
+      <div class="site-stat"><span class="lbl">Total Tonnes</span>
+        <span class="val">${Math.round(siteTons).toLocaleString()}</span></div>
+      ${siteFaults>0?`<div class="site-stat"><span class="lbl">Total Faults</span>
+        <span class="val" style="color:var(--danger)">${siteFaults.toLocaleString()}</span></div>
+      <div class="site-stat"><span class="lbl">Site Tons / Fault</span>
+        <span class="val" style="color:var(--accent2)">${n1(siteTons/siteFaults)}</span></div>`:''}
+    </div>
+  </div>`;
+
+  // Charts
+  html += `
+  <div class="charts-row">
+    <div class="chart-card" style="flex:1 1 calc(50% - 12px)">
+      <h4>📈 Cumulative Site Total per Rotation — All Machines Combined</h4>
+      <canvas id="chartSiteTotals" height="130"></canvas>
+    </div>
+    <div class="chart-card" style="flex:1 1 calc(50% - 12px)">
+      <h4>📊 Site Average per Rotation (All Machines · All Crews)</h4>
+      <canvas id="chartSiteAvg" height="130"></canvas>
+    </div>
+  </div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <h4>Total Tons per Machine</h4>
+      <canvas id="chartCombMachine" height="120"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>Total Tons per Crew (All Machines)</h4>
+      <canvas id="chartCombCrew" height="120"></canvas>
+    </div>
+  </div>
+  <div class="charts-row">
+    <div class="chart-card" style="flex:1 1 calc(50% - 12px)">
+      <h4>Cumulative Tons per Machine (All Crews)</h4>
+      <canvas id="chartCombMachineRot" height="120"></canvas>
+    </div>
+    <div class="chart-card" style="flex:1 1 calc(50% - 12px)">
+      <h4>Cumulative Tons / Fault per Machine (All Crews)</h4>
+      <canvas id="chartCombMachineTpf" height="120"></canvas>
+    </div>
+  </div>
+  <h4 style="color:var(--fg);margin:18px 0 10px">Tons per Rotation by Machine</h4>
+  <div class="charts-row" style="flex-wrap:wrap">
+    ${MACHINES.map(m => `<div class="chart-card" style="flex:1 1 calc(50% - 12px);min-width:280px"><h4>${m}</h4><canvas id="chartMachRot_${m}" height="130"></canvas></div>`).join('')}
+  </div>
+  <h4 style="color:var(--fg);margin:18px 0 10px">Tons / Fault per Rotation by Machine</h4>
+  <div class="charts-row" style="flex-wrap:wrap">
+    ${MACHINES.map(m => `<div class="chart-card" style="flex:1 1 calc(50% - 12px);min-width:280px"><h4>${m}</h4><canvas id="chartMachTpf_${m}" height="130"></canvas></div>`).join('')}
+  </div>
+  <h4 style="color:var(--fg);margin:18px 0 10px">Sum of All Machine Averages per Rotation</h4>
+  <div class="charts-row">
+    <div class="chart-card" style="flex:1 1 calc(50% - 12px)">
+      <h4>Running Avg Tons per Machine</h4>
+      <canvas id="chartSumAvgTons" height="130"></canvas>
+    </div>
+    <div class="chart-card" style="flex:1 1 calc(50% - 12px)">
+      <h4>Running Avg Tons / Fault per Machine</h4>
+      <canvas id="chartSumAvgTpf" height="130"></canvas>
+    </div>
+  </div>`;
+
+  setContainer('combinedContainer', html);
+
+  // Site average chart — all machines + all crews averaged per rotation
+  const siteMaxRots = Math.max(...MACHINES.map(m =>
+    Math.max(...CREWS.map(c => ((data[m]||{})[c]||[]).length), 0)
+  ), 0);
+  const siteRotLabels = Array.from({length: siteMaxRots}, (_, i) => `R${i+1}`);
+
+  // Collect per-rotation site totals (sum all machines + crews)
+  const siteRotTons = Array.from({length: siteMaxRots}, (_, i) =>
+    MACHINES.reduce((s, m) => s + CREWS.reduce((ss, c) => ss + (((data[m]||{})[c]||[])[i]?.tt ?? 0), 0), 0)
+  );
+  const siteRotTpf = Array.from({length: siteMaxRots}, (_, i) => {
+    const tt = MACHINES.reduce((s, m) => s + CREWS.reduce((ss, c) => ss + (((data[m]||{})[c]||[])[i]?.tt ?? 0), 0), 0);
+    const tf = MACHINES.reduce((s, m) => s + CREWS.reduce((ss, c) => ss + (((data[m]||{})[c]||[])[i]?.tf ?? 0), 0), 0);
+    return tf > 0 ? tt / tf : 0;
+  });
+
+  // Running averages (include 0s)
+  const siteAvgTons = siteRotTons.map((_, i) =>
+    Math.round((siteRotTons.slice(0, i+1).reduce((s,v)=>s+v,0) / (i+1)) * 10) / 10
+  );
+  const siteAvgTpf = siteRotTpf.map((_, i) =>
+    Math.round((siteRotTpf.slice(0, i+1).reduce((s,v)=>s+v,0) / (i+1)) * 10) / 10
+  );
+
+  new Chart(document.getElementById('chartSiteAvg'), {
+    type: 'line',
+    data: {
+      labels: siteRotLabels,
+      datasets: [
+        {
+          label: 'Avg Tons per Rotation',
+          data: siteAvgTons,
+          borderColor: '#3fb950', backgroundColor: '#3fb95033',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#3fb950',
+          fill: true, tension: 0.3, yAxisID: 'y'
+        },
+        {
+          label: 'Avg Tons / Fault per Rotation',
+          data: siteAvgTpf,
+          borderColor: '#d2a8ff', backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#d2a8ff',
+          fill: false, tension: 0.3, yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      ...chartOpts(),
+      plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } },
+      scales: {
+        x:  { ticks:{color:'#8b949e',font:{size:10}}, grid:{color:'#21262d'} },
+        y:  { type:'linear', position:'left',  ticks:{color:'#3fb950',font:{size:10}}, grid:{color:'#21262d'}, title:{display:true,text:'Avg Tons',color:'#3fb950',font:{size:10}} },
+        y1: { type:'linear', position:'right', ticks:{color:'#d2a8ff',font:{size:10}}, grid:{drawOnChartArea:false}, title:{display:true,text:'Avg t/f',color:'#d2a8ff',font:{size:10}} }
+      }
+    }
+  });
+
+  // Site totals per rotation (cumulative sum, dual axis)
+  const siteCumTons = siteRotTons.map((_, i) =>
+    Math.round(siteRotTons.slice(0, i + 1).reduce((s, v) => s + v, 0) * 10) / 10
+  );
+  const siteCumTpf = siteRotTpf.map((_, i) =>
+    Math.round(siteRotTpf.slice(0, i + 1).reduce((s, v) => s + v, 0) * 10) / 10
+  );
+  new Chart(document.getElementById('chartSiteTotals'), {
+    type: 'line',
+    data: {
+      labels: siteRotLabels,
+      datasets: [
+        {
+          label: 'Cumulative Tons (all machines)',
+          data: siteCumTons,
+          borderColor: '#3fb950', backgroundColor: '#3fb95033',
+          borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#3fb950',
+          fill: true, tension: 0.3, yAxisID: 'y'
+        },
+        {
+          label: 'Cumulative Tons / Fault (all machines)',
+          data: siteCumTpf,
+          borderColor: '#d2a8ff', backgroundColor: 'transparent',
+          borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#d2a8ff',
+          fill: false, tension: 0.3, yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      ...chartOpts(),
+      plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } },
+      scales: {
+        x:  { ticks:{color:'#8b949e',font:{size:10}}, grid:{color:'#21262d'} },
+        y:  { type:'linear', position:'left',  ticks:{color:'#3fb950',font:{size:10}}, grid:{color:'#21262d'}, title:{display:true,text:'Cumulative Tons',color:'#3fb950',font:{size:10}} },
+        y1: { type:'linear', position:'right', ticks:{color:'#d2a8ff',font:{size:10}}, grid:{drawOnChartArea:false}, title:{display:true,text:'Cumulative Tons/Fault',color:'#d2a8ff',font:{size:10}} }
+      }
+    }
+  });
+
+  // Machine bar chart
+  const machineTonsArr = MACHINES.map(m => {
+    const md = data[m] || {};
+    return CREWS.reduce((s,c)=>s+(md[c]||[]).reduce((ss,r)=>ss+r.tt,0), 0);
+  });
+  new Chart(document.getElementById('chartCombMachine'), {
+    type: 'bar',
+    data: { labels: MACHINES,
+      datasets: [{ label: 'Total Tons', data: machineTonsArr,
+        backgroundColor: '#1f6feb88', borderColor: '#1f6feb', borderWidth: 1 }]
+    },
+    options: chartOpts()
+  });
+
+  // Crew bar chart
+  const crewTonsArr = CREWS.map(crew =>
+    MACHINES.reduce((s,m)=>s+((data[m]||{})[crew]||[]).reduce((ss,r)=>ss+r.tt,0), 0)
+  );
+  new Chart(document.getElementById('chartCombCrew'), {
+    type: 'bar',
+    data: {
+      labels: CREWS.map(c => c + ' Crew'),
+      datasets: [{ label: 'Total Tons',
+        data: crewTonsArr,
+        backgroundColor: CREWS.map(c => CREW_COLORS[c] + '88'),
+        borderColor: CREWS.map(c => CREW_COLORS[c]),
+        borderWidth: 1,
+      }]
+    },
+    options: chartOpts()
+  });
+
+  // Cumulative tons per machine across rotations
+  const MCOLORS = ['#388bfd','#3fb950','#f78166','#d2a8ff','#79c0ff','#ffa657','#56d364','#ff7b72'];
+  const maxMachineRots = Math.max(...MACHINES.map(m =>
+    Math.max(...CREWS.map(c => ((data[m]||{})[c]||[]).length), 0)
+  ), 0);
+  const machineRotLabels = Array.from({length: maxMachineRots}, (_, i) => `R${i+1}`);
+  const machineRotDatasets = MACHINES.map((m, mi) => {
+    const col = MCOLORS[mi % MCOLORS.length];
+    let cum = 0;
+    const cumData = Array.from({length: maxMachineRots}, (_, i) => {
+      cum += CREWS.reduce((s, c) => {
+        const rot = ((data[m]||{})[c]||[])[i];
+        return s + (rot ? rot.tt : 0);
+      }, 0);
+      return Math.round(cum * 10) / 10;
+    });
+    return {
+      label: m, data: cumData,
+      borderColor: col, backgroundColor: 'transparent',
+      borderWidth: 2, pointRadius: 3, pointBackgroundColor: col,
+      tension: 0.3
+    };
+  });
+  new Chart(document.getElementById('chartCombMachineRot'), {
+    type: 'line',
+    data: { labels: machineRotLabels, datasets: machineRotDatasets },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+
+  // Cumulative tons/fault per machine across rotations
+  const machineTpfDatasets = MACHINES.map((m, mi) => {
+    const col = MCOLORS[mi % MCOLORS.length];
+    let cumTpf = 0;
+    const cumData = Array.from({length: maxMachineRots}, (_, i) => {
+      const rotTons   = CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[i]?.tt ?? 0), 0);
+      const rotFaults = CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[i]?.tf ?? 0), 0);
+      if (rotFaults > 0) cumTpf += Math.round((rotTons / rotFaults) * 10) / 10;
+      return Math.round(cumTpf * 10) / 10;
+    });
+    return {
+      label: m, data: cumData,
+      borderColor: col, backgroundColor: 'transparent',
+      borderWidth: 2, pointRadius: 3, pointBackgroundColor: col,
+      tension: 0.3, spanGaps: true
+    };
+  });
+  new Chart(document.getElementById('chartCombMachineTpf'), {
+    type: 'line',
+    data: { labels: machineRotLabels, datasets: machineTpfDatasets },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+
+  // Per-machine bar (rotation tons) + running avg line
+  MACHINES.forEach((m, mi) => {
+    const col = MCOLORS[mi % MCOLORS.length];
+    const rotTonsArr = Array.from({length: maxMachineRots}, (_, i) =>
+      CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[i]?.tt ?? 0), 0)
+    );
+    const labels = Array.from({length: maxMachineRots}, (_, i) => `R${i+1}`);
+    let runSum = 0;
+    const avgLine = rotTonsArr.map((v, i) => {
+      runSum += v;
+      return Math.round((runSum / (i + 1)) * 10) / 10;
+    });
+    new Chart(document.getElementById(`chartMachRot_${m}`), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'bar', label: 'Tons this Rotation',
+            data: rotTonsArr,
+            backgroundColor: col + '88', borderColor: col, borderWidth: 1, order: 2
+          },
+          {
+            type: 'line', label: 'Running Avg Tons',
+            data: avgLine,
+            borderColor: '#ffd700', backgroundColor: 'transparent',
+            borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#ffd700',
+            tension: 0.3, order: 1
+          }
+        ]
+      },
+      options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 10 } } } } }
+    });
+  });
+
+  // Per-machine tons/fault bar + running avg line
+  MACHINES.forEach((m, mi) => {
+    const col = MCOLORS[mi % MCOLORS.length];
+    const labels = Array.from({length: maxMachineRots}, (_, i) => `R${i+1}`);
+    const rotTpfArr = Array.from({length: maxMachineRots}, (_, i) => {
+      const tt = CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[i]?.tt ?? 0), 0);
+      const tf = CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[i]?.tf ?? 0), 0);
+      return tf > 0 ? Math.round((tt / tf) * 10) / 10 : 0;
+    });
+    const avgLine = rotTpfArr.map((v, i) =>
+      Math.round((rotTpfArr.slice(0, i + 1).reduce((s, x) => s + x, 0) / (i + 1)) * 10) / 10
+    );
+    new Chart(document.getElementById(`chartMachTpf_${m}`), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'bar', label: 'Tons / Fault this Rotation',
+            data: rotTpfArr,
+            backgroundColor: col + '88', borderColor: col, borderWidth: 1, order: 2
+          },
+          {
+            type: 'line', label: 'Running Avg Tons / Fault',
+            data: avgLine,
+            borderColor: '#ffd700', backgroundColor: 'transparent',
+            borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#ffd700',
+            tension: 0.3, order: 1
+          }
+        ]
+      },
+      options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 10 } } } } }
+    });
+  });
+
+  // Per-machine running average lines (tons)
+  const combRotLabels = Array.from({length: maxMachineRots}, (_, i) => `R${i+1}`);
+
+  const perMachAvgTonsDatasets = MACHINES.map((m, mi) => {
+    const col = MCOLORS[mi % MCOLORS.length];
+    const avgData = Array.from({length: maxMachineRots}, (_, i) => {
+      const rotTons = Array.from({length: i + 1}, (__, j) =>
+        CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[j]?.tt ?? 0), 0)
+      );
+      return Math.round((rotTons.reduce((s, v) => s + v, 0) / (i + 1)) * 10) / 10;
+    });
+    return { label: m, data: avgData, borderColor: col, backgroundColor: 'transparent',
+      borderWidth: 2, pointRadius: 3, pointBackgroundColor: col, tension: 0.3 };
+  });
+
+  new Chart(document.getElementById('chartSumAvgTons'), {
+    type: 'line',
+    data: { labels: combRotLabels, datasets: perMachAvgTonsDatasets },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+
+  // Per-machine running average lines (tons/fault)
+  const perMachAvgTpfDatasets = MACHINES.map((m, mi) => {
+    const col = MCOLORS[mi % MCOLORS.length];
+    const rotVals = Array.from({length: maxMachineRots}, (_, i) => {
+      const tt = CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[i]?.tt ?? 0), 0);
+      const tf = CREWS.reduce((s, c) => s + (((data[m]||{})[c]||[])[i]?.tf ?? 0), 0);
+      return tf > 0 ? tt / tf : 0;
+    });
+    const avgData = rotVals.map((_, i) =>
+      Math.round((rotVals.slice(0, i + 1).reduce((s, x) => s + x, 0) / (i + 1)) * 10) / 10
+    );
+    return { label: m, data: avgData, borderColor: col, backgroundColor: 'transparent',
+      borderWidth: 2, pointRadius: 3, pointBackgroundColor: col, tension: 0.3 };
+  });
+
+  new Chart(document.getElementById('chartSumAvgTpf'), {
+    type: 'line',
+    data: { labels: combRotLabels, datasets: perMachAvgTpfDatasets },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Charts (single-crew)
+// ═══════════════════════════════════════════════════════════════════════
+function renderCharts() {
+  ['tons','cumulative','weekly','tpf'].forEach(k => {
+    if (S.charts[k]) { S.charts[k].destroy(); delete S.charts[k]; }
+  });
+
+  const rots = S.rotations;
+  if (!rots.length) return;
+
+  const color = CREW_COLORS[S.crew] || '#388bfd';
+  const rotLabels = rots.map(r => `R${r.rotation}`);
+
+  // ── 1. Total Tons per Rotation (bar + running avg line) ─────────────
+  const avgTonsData = rots.map((_, i) => {
+    const slice = rots.slice(0, i + 1);
+    return Math.round((slice.reduce((s, x) => s + x.total_tons, 0) / slice.length) * 10) / 10;
+  });
+  S.charts.tons = new Chart(document.getElementById('chartTons'), {
+    type: 'bar',
+    data: {
+      labels: rotLabels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Tons this Rotation',
+          data: rots.map(r => r.total_tons),
+          backgroundColor: color + '88',
+          borderColor: color,
+          borderWidth: 1,
+          order: 2
+        },
+        {
+          type: 'line',
+          label: 'Running Avg Tons',
+          data: avgTonsData,
+          borderColor: '#ffd700',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#ffd700',
+          tension: 0.3,
+          order: 1
+        }
+      ]
+    },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+
+  // ── 2. Cumulative Tons across rotations ───────────────────────────
+  let running = 0;
+  const cumData = rots.map(r => { running += r.total_tons; return Math.round(running * 10) / 10; });
+  S.charts.cumulative = new Chart(document.getElementById('chartCumulative'), {
+    type: 'line',
+    data: {
+      labels: rotLabels,
+      datasets: [{
+        label: 'Cumulative Tons',
+        data: cumData,
+        borderColor: color,
+        backgroundColor: color + '22',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: color,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+
+  // ── 3. Cumulative Avg Tons / Fault across rotations ─────────────────
+  // Running total: each rotation's tons/fault added to the previous sum
+  let cumSum = 0;
+  const cumTpfData2 = rots.map(r => {
+    if (r.total_faults > 0) cumSum += r.tons_per_fault;
+    return Math.round(cumSum * 10) / 10;
+  });
+  S.charts.weekly = new Chart(document.getElementById('chartWeekly'), {
+    type: 'line',
+    data: {
+      labels: rotLabels,
+      datasets: [{
+        label: 'Cumulative Avg Tons / Fault',
+        data: cumTpfData2,
+        borderColor: '#3fb950',
+        backgroundColor: '#3fb95022',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: '#3fb950',
+        fill: true,
+        tension: 0.3,
+        spanGaps: true
+      }]
+    },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+
+  // ── 4. Avg Tons per Fault per Rotation (bar + running avg line) ────
+  const avgTpfData = rots.map((_, i) => {
+    const slice = rots.slice(0, i + 1);
+    const vals = slice.map(x => x.total_faults > 0 ? x.tons_per_fault : 0);
+    return Math.round((vals.reduce((s, x) => s + x, 0) / vals.length) * 10) / 10;
+  });
+  S.charts.tpf = new Chart(document.getElementById('chartTpf'), {
+    type: 'bar',
+    data: {
+      labels: rotLabels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Tons / Fault this Rotation',
+          data: rots.map(r => r.total_faults > 0 ? (r.tons_per_fault || 0) : 0),
+          backgroundColor: '#f7816688',
+          borderColor: '#f78166',
+          borderWidth: 1,
+          order: 2
+        },
+        {
+          type: 'line',
+          label: 'Running Avg Tons / Fault',
+          data: avgTpfData,
+          borderColor: '#ffd700',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#ffd700',
+          tension: 0.3,
+          order: 1
+        }
+      ]
+    },
+    options: { ...chartOpts(), plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } } }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Reports
+// ═══════════════════════════════════════════════════════════════════════
+function _buildReportData() {
+  const data = _lastCombinedData || {};
+  const now  = new Date().toLocaleString();
+  let siteTons = 0, siteFaults = 0;
+
+  const machines = MACHINES.map(m => {
+    let mTons = 0, mFaults = 0;
+    const crews = CREWS.map(crew => {
+      const rots  = (data[m]||{})[crew] || [];
+      const tt    = rots.reduce((s,r)=>s+r.tt, 0);
+      const tf    = rots.reduce((s,r)=>s+r.tf, 0);
+      mTons += tt; mFaults += tf;
+      return { crew, tt, tf, rots: rots.length };
+    });
+    siteTons += mTons; siteFaults += mFaults;
+    return { machine: m, tt: mTons, tf: mFaults, crews };
+  });
+
+  const crewTotals = CREWS.map(crew => {
+    const tt = MACHINES.reduce((s,m)=>s+((data[m]||{})[crew]||[]).reduce((ss,r)=>ss+r.tt,0),0);
+    const tf = MACHINES.reduce((s,m)=>s+((data[m]||{})[crew]||[]).reduce((ss,r)=>ss+r.tf,0),0);
+    return { crew, tt, tf };
+  });
+
+  return { now, machines, crewTotals, siteTons, siteFaults };
+}
+
+function printReport() {
+  const d = _buildReportData();
+  if (!d) { alert('Load the Combined view first.'); return; }
+
+  const tf = (tt, faults) => faults > 0 ? (tt/faults).toFixed(1) : '—';
+  const n1 = v => v.toLocaleString(undefined, {maximumFractionDigits:1});
+
+  let machRows = d.machines.map(m => `
+    <tr>
+      <td><strong>${m.machine}</strong></td>
+      <td>${n1(m.tt)} t</td>
+      <td>${m.tf}</td>
+      <td>${tf(m.tt, m.tf)}</td>
+    </tr>
+    ${m.crews.map(c => `
+      <tr class="sub">
+        <td style="padding-left:24px">└ ${c.crew} Crew (${c.rots} rot)</td>
+        <td>${n1(c.tt)} t</td>
+        <td>${c.tf}</td>
+        <td>${tf(c.tt, c.tf)}</td>
+      </tr>`).join('')}
+  `).join('');
+
+  let crewRows = d.crewTotals.map(c => `
+    <tr>
+      <td>${c.crew} Crew</td>
+      <td>${n1(c.tt)} t</td>
+      <td>${c.tf}</td>
+      <td>${tf(c.tt, c.tf)}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>Mining Report — ${d.now}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 32px; max-width: 900px; margin: 0 auto; }
+    h1   { font-size: 20px; margin-bottom: 4px; }
+    h2   { font-size: 15px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-top: 28px; }
+    .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th   { background: #f0f0f0; text-align: left; padding: 6px 10px; font-size: 12px; }
+    td   { padding: 5px 10px; border-bottom: 1px solid #eee; }
+    tr.sub td { color: #555; font-size: 12px; }
+    .site-box { background: #f7f7f7; border: 1px solid #ddd; border-radius: 6px; padding: 14px 20px; display: flex; gap: 40px; margin-bottom: 8px; }
+    .site-stat .lbl { font-size: 11px; color: #888; display: block; }
+    .site-stat .val { font-size: 22px; font-weight: bold; }
+    @media print { button { display: none; } }
+  </style>
+  </head><body>
+  <h1>⛏ Mining Production Report</h1>
+  <p class="meta">Generated: ${d.now}</p>
+
+  <h2>Site Summary</h2>
+  <div class="site-box">
+    <div class="site-stat"><span class="lbl">Total Tonnes</span><span class="val">${Math.round(d.siteTons).toLocaleString()}</span></div>
+    <div class="site-stat"><span class="lbl">Total Faults</span><span class="val">${d.siteFaults.toLocaleString()}</span></div>
+    ${d.siteFaults > 0 ? `<div class="site-stat"><span class="lbl">Site Tons / Fault</span><span class="val">${tf(d.siteTons, d.siteFaults)}</span></div>` : ''}
+  </div>
+
+  <h2>By Machine</h2>
+  <table>
+    <tr><th>Machine / Crew</th><th>Total Tons</th><th>Faults</th><th>Tons / Fault</th></tr>
+    ${machRows}
+  </table>
+
+  <h2>By Crew (All Machines)</h2>
+  <table>
+    <tr><th>Crew</th><th>Total Tons</th><th>Faults</th><th>Tons / Fault</th></tr>
+    ${crewRows}
+  </table>
+
+  <button onclick="window.print()" style="margin-top:16px;padding:8px 20px;font-size:13px;cursor:pointer">🖨 Print / Save as PDF</button>
+  </body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+function emailReport() {
+  const d = _buildReportData();
+  if (!d) { alert('Load the Combined view first.'); return; }
+
+  const tf = (tt, faults) => faults > 0 ? (tt/faults).toFixed(1) + ' t/f' : '—';
+  const n1 = v => v.toLocaleString(undefined, {maximumFractionDigits:1});
+  const pad = (s, w) => String(s).padEnd(w);
+
+  let lines = [
+    '⛏ MINING PRODUCTION REPORT',
+    `Generated: ${d.now}`,
+    '',
+    '── SITE SUMMARY ──────────────────────────',
+    `Total Tonnes : ${Math.round(d.siteTons).toLocaleString()}`,
+    `Total Faults : ${d.siteFaults}`,
+    d.siteFaults > 0 ? `Tons / Fault : ${tf(d.siteTons, d.siteFaults)}` : '',
+    '',
+    '── BY MACHINE ────────────────────────────',
+    `${pad('Machine',8)} ${pad('Tons',12)} ${pad('Faults',8)} T/F`,
+    '─'.repeat(40),
+    ...d.machines.flatMap(m => [
+      `${pad(m.machine,8)} ${pad(n1(m.tt)+'t',12)} ${pad(m.tf,8)} ${tf(m.tt,m.tf)}`,
+      ...m.crews.map(c => `  └${pad(c.crew+' Crew',7)} ${pad(n1(c.tt)+'t',12)} ${pad(c.tf,8)} ${tf(c.tt,c.tf)}`)
+    ]),
+    '',
+    '── BY CREW (ALL MACHINES) ────────────────',
+    `${pad('Crew',10)} ${pad('Tons',12)} ${pad('Faults',8)} T/F`,
+    '─'.repeat(40),
+    ...d.crewTotals.map(c => `${pad(c.crew+' Crew',10)} ${pad(n1(c.tt)+'t',12)} ${pad(c.tf,8)} ${tf(c.tt,c.tf)}`),
+  ].filter(l => l !== undefined);
+
+  const body = encodeURIComponent(lines.join('\n'));
+  const subject = encodeURIComponent(`Mining Production Report — ${d.now}`);
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+}
+
+async function exportSnapshot(autoPrint=false) {
+  const sel = autoPrint ? '[onclick="exportSnapshot(true)"]' : '[onclick="exportSnapshot()"]';
+  const btn = document.querySelector(sel);
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Building…';
+  btn.disabled = true;
+
+  try {
+    // Fetch Chart.js source so the file works fully offline
+    const chartJsSrc = await fetch('https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js')
+      .then(r => r.text()).catch(() => null);
+
+    // Fetch all data needed for the snapshot
+    const [combined, ...machineData] = await Promise.all([
+      fetch('/api/combined').then(r => r.json()),
+      ...MACHINES.map(m =>
+        Promise.all(CREWS.map(c =>
+          fetch(`/api/shifts?machine=${m}&crew=${c}`).then(r => r.json()).catch(() => ({rotations:[]}))
+        )).then(results => ({ machine: m, crews: Object.fromEntries(CREWS.map((c,i) => [c, results[i]])) }))
+      )
+    ]);
+
+    const d = _buildReportData();
+    const tf = (tt, faults) => faults > 0 ? (tt/faults).toFixed(1) : '—';
+    const n1 = v => Number(v).toLocaleString(undefined, {maximumFractionDigits:1});
+    const now = d.now;
+
+    // Build per-machine rotation tables
+    let machTables = MACHINES.map((m, mi) => {
+      const md = combined[m] || {};
+      const MCOLORS = ['#388bfd','#3fb950','#f78166','#d2a8ff','#79c0ff','#ffa657','#56d364','#ff7b72'];
+      const col = MCOLORS[mi % MCOLORS.length];
+      let mTons = 0, mFaults = 0;
+      const crewRows = CREWS.map(crew => {
+        const rots = md[crew] || [];
+        const tt = rots.reduce((s,r)=>s+r.tt,0);
+        const tfv = rots.reduce((s,r)=>s+r.tf,0);
+        mTons += tt; mFaults += tfv;
+        return `<tr><td style="padding-left:20px;color:#666">└ ${crew} Crew</td><td>${n1(tt)} t</td><td>${tfv}</td><td>${tf(tt,tfv)}</td><td>${rots.length}</td></tr>`;
+      }).join('');
+      return `
+        <tr style="background:#f4f4f4">
+          <td><strong style="color:${col}">${m}</strong></td>
+          <td><strong>${n1(mTons)} t</strong></td>
+          <td><strong>${mFaults}</strong></td>
+          <td><strong>${tf(mTons,mFaults)}</strong></td>
+          <td></td>
+        </tr>${crewRows}`;
+    }).join('');
+
+    const crewRows = d.crewTotals.map(c =>
+      `<tr><td>${c.crew} Crew</td><td>${n1(c.tt)} t</td><td>${c.tf}</td><td>${tf(c.tt,c.tf)}</td></tr>`
+    ).join('');
+
+    const chartJsTag = chartJsSrc
+      ? `<script>${chartJsSrc}<\/script>`
+      : `<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"><\/script>`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Mining Snapshot — ${now}</title>
+${chartJsTag}
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:24px 32px;max-width:1100px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px}
+  h2{font-size:16px;border-bottom:2px solid #333;padding-bottom:4px;margin-top:32px;margin-bottom:12px}
+  h3{font-size:14px;margin:20px 0 6px;color:#333}
+  h4{font-size:12px;margin:0 0 8px;color:#555;font-weight:600}
+  .meta{color:#666;font-size:12px;margin-bottom:20px}
+  table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}
+  th{background:#f0f0f0;text-align:left;padding:6px 10px}
+  td{padding:5px 10px;border-bottom:1px solid #eee}
+  tr.machine-row{background:#f4f4f4}
+  tr.crew-row td:first-child{padding-left:22px;color:#555}
+  .site-box{background:#f7f7f7;border:1px solid #ddd;border-radius:6px;padding:14px 20px;display:flex;gap:32px;margin-bottom:16px;flex-wrap:wrap}
+  .site-stat .lbl{font-size:11px;color:#888;display:block}.site-stat .val{font-size:22px;font-weight:bold}
+  .chart-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .chart-box{flex:1 1 calc(50% - 14px);min-width:260px;border:1px solid #ddd;border-radius:6px;padding:12px;page-break-inside:avoid}
+  .chart-box.full{flex:1 1 100%}
+  .chart-box.third{flex:1 1 calc(33% - 14px);min-width:220px}
+  canvas{max-width:100%;display:block}
+  .page-break{page-break-before:always;border-top:2px dashed #ccc;margin-top:32px;padding-top:8px}
+  .crew-pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;color:#fff;margin-right:4px}
+  .cp-B{background:#388bfd}.cp-D{background:#3fb950}.cp-C{background:#f78166}.cp-A{background:#d2a8ff;color:#333}
+  @page{size:A4;margin:1.5cm}
+  @media print{.no-print{display:none}.page-break{page-break-before:always}}
+</style>
+</head><body>
+<h1>⛏ Mining Production Snapshot</h1>
+<p class="meta">Generated: ${now} &nbsp;·&nbsp; Read-only offline report</p>
+
+<!-- ── SITE SUMMARY ── -->
+<h2>Site Summary</h2>
+<div class="site-box">
+  <div class="site-stat"><span class="lbl">Total Tonnes</span><span class="val">${Math.round(d.siteTons).toLocaleString()}</span></div>
+  <div class="site-stat"><span class="lbl">Total Faults</span><span class="val">${d.siteFaults.toLocaleString()}</span></div>
+  ${d.siteFaults > 0 ? `<div class="site-stat"><span class="lbl">Site Tons / Fault</span><span class="val">${tf(d.siteTons,d.siteFaults)}</span></div>` : ''}
+</div>
+<div class="chart-row">
+  <div class="chart-box full"><h4>📊 Site Average per Rotation — Avg Tons &amp; Avg Tons/Fault</h4><canvas id="cSiteAvg" height="70"></canvas></div>
+</div>
+
+<!-- ── BY MACHINE TABLE ── -->
+<h2>By Machine &amp; Crew</h2>
+<table>
+  <tr><th>Machine / Crew</th><th>Total Tons</th><th>Faults</th><th>Tons/Fault</th><th>Rotations</th></tr>
+  ${machTables}
+</table>
+
+<!-- ── BY CREW TABLE ── -->
+<h2>By Crew (All Machines)</h2>
+<table>
+  <tr><th>Crew</th><th>Total Tons</th><th>Faults</th><th>Tons/Fault</th></tr>
+  ${crewRows}
+</table>
+
+<!-- ── COMBINED CHARTS ── -->
+<div class="page-break"><h2>Combined Charts</h2></div>
+<div class="chart-row">
+  <div class="chart-box"><h4>Total Tons per Machine</h4><canvas id="cMach"></canvas></div>
+  <div class="chart-box"><h4>Total Tons per Crew (All Machines)</h4><canvas id="cCrew"></canvas></div>
+</div>
+<div class="chart-row">
+  <div class="chart-box"><h4>Cumulative Tons per Machine</h4><canvas id="cCumTons" height="100"></canvas></div>
+  <div class="chart-box"><h4>Cumulative Tons/Fault per Machine</h4><canvas id="cCumTpf" height="100"></canvas></div>
+</div>
+<div class="chart-row">
+  <div class="chart-box"><h4>Running Avg Tons per Machine</h4><canvas id="cAvgTons" height="100"></canvas></div>
+  <div class="chart-box"><h4>Running Avg Tons/Fault per Machine</h4><canvas id="cAvgTpf" height="100"></canvas></div>
+</div>
+
+<!-- ── PER-MACHINE CHARTS ── -->
+<div class="page-break"><h2>Tons per Rotation — Per Machine</h2></div>
+<div class="chart-row">
+  ${MACHINES.map(m=>`<div class="chart-box"><h4>${m}</h4><canvas id="cMR_${m}"></canvas></div>`).join('')}
+</div>
+
+<h2 style="margin-top:24px">Tons/Fault per Rotation — Per Machine</h2>
+<div class="chart-row">
+  ${MACHINES.map(m=>`<div class="chart-box"><h4>${m}</h4><canvas id="cTF_${m}"></canvas></div>`).join('')}
+</div>
+
+<!-- ── PER-MACHINE / PER-CREW DETAIL ── -->
+<div class="page-break"><h2>Per-Machine · Per-Crew Detail</h2></div>
+${MACHINES.map((m,mi)=>{
+  const MCOLORS2=['#388bfd','#3fb950','#f78166','#d2a8ff','#79c0ff','#ffa657','#56d364','#ff7b72'];
+  const col=MCOLORS2[mi%MCOLORS2.length];
+  const md = combined[m]||{};
+  const crewSections = CREWS.map(crew=>{
+    const rots = md[crew]||[];
+    if(!rots.length) return '';
+    const rows = rots.map((r,i)=>`<tr><td>R${i+1}</td><td>${n1(r.tt)} t</td><td>${r.tf}</td><td>${r.tf>0?n1(r.tt/r.tf):'—'}</td></tr>`).join('');
+    return `<div style="margin-bottom:16px">
+      <h4><span class="crew-pill cp-${crew}">${crew}</span> Crew — ${rots.length} rotations</h4>
+      <div class="chart-row" style="margin-bottom:8px">
+        <div class="chart-box third"><h4>Tons per Rotation</h4><canvas id="cD_${m}_${crew}_tons"></canvas></div>
+        <div class="chart-box third"><h4>Tons/Fault per Rotation</h4><canvas id="cD_${m}_${crew}_tpf"></canvas></div>
+        <div class="chart-box third"><h4>Cumulative Tons</h4><canvas id="cD_${m}_${crew}_cum"></canvas></div>
+      </div>
+      <table><tr><th>Rotation</th><th>Tons</th><th>Faults</th><th>Tons/Fault</th></tr>${rows}</table>
+    </div>`;
+  }).join('');
+  return `<h3 style="color:${col};border-left:4px solid ${col};padding-left:8px">${m}</h3>${crewSections}`;
+}).join('')}
+
+<button class="no-print" onclick="window.print()" style="margin-top:24px;padding:8px 20px;font-size:13px;cursor:pointer">🖨 Print / Save as PDF</button>
+
+<script>
+(function(){
+  const MACHINES   = ${JSON.stringify(MACHINES)};
+  const CREWS      = ${JSON.stringify(CREWS)};
+  const CREW_COLORS= ${JSON.stringify(CREW_COLORS)};
+  const MCOLORS    = ['#388bfd','#3fb950','#f78166','#d2a8ff','#79c0ff','#ffa657','#56d364','#ff7b72'];
+  const data       = ${JSON.stringify(combined)};
+  const rotData    = ${JSON.stringify(Object.fromEntries(machineData.map(md=>[md.machine,md.crews])))};
+  const n1 = v => Math.round(v*10)/10;
+  const avg = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
+  const chartDef = (type,labels,datasets,opts={})=>({type,data:{labels,datasets},options:{responsive:true,plugins:{legend:{display:datasets.length>1,labels:{font:{size:9},boxWidth:10}}},...opts}});
+  const line = (label,data,color,fill=false)=>({type:'line',label,data,borderColor:color,backgroundColor:fill?color+'33':'transparent',borderWidth:2,pointRadius:2,pointBackgroundColor:color,tension:0.3,fill});
+  const bar  = (label,data,color)=>({type:'bar',label,data,backgroundColor:color+'88',borderColor:color,borderWidth:1,order:2});
+  const sc   = id=>document.getElementById(id);
+  const scales = {x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:9}}}};
+
+  const maxRots = Math.max(...MACHINES.map(m=>Math.max(...CREWS.map(c=>((data[m]||{})[c]||[]).length),0)),0);
+  const rotLabels = Array.from({length:maxRots},(_,i)=>'R'+(i+1));
+
+  // ── Site avg chart (dual axis) ──────────────────────────────────────
+  const siteRotTons = Array.from({length:maxRots},(_,i)=>MACHINES.reduce((s,m)=>s+CREWS.reduce((ss,c)=>ss+(((data[m]||{})[c]||[])[i]?.tt??0),0),0));
+  const siteRotTpf  = Array.from({length:maxRots},(_,i)=>{
+    const tt=MACHINES.reduce((s,m)=>s+CREWS.reduce((ss,c)=>ss+(((data[m]||{})[c]||[])[i]?.tt??0),0),0);
+    const tf=MACHINES.reduce((s,m)=>s+CREWS.reduce((ss,c)=>ss+(((data[m]||{})[c]||[])[i]?.tf??0),0),0);
+    return tf>0?tt/tf:0;
+  });
+  const siteAvgTons = siteRotTons.map((_,i)=>n1(siteRotTons.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1)));
+  const siteAvgTpf  = siteRotTpf.map((_,i)=>n1(siteRotTpf.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1)));
+  new Chart(sc('cSiteAvg'),{type:'line',data:{labels:rotLabels,datasets:[
+    {...line('Avg Tons',siteAvgTons,'#3fb950',true),yAxisID:'y'},
+    {...line('Avg Tons/Fault',siteAvgTpf,'#d2a8ff'),yAxisID:'y1'}
+  ]},options:{responsive:true,plugins:{legend:{display:true,labels:{font:{size:10}}}},scales:{
+    x:{ticks:{font:{size:9}}},
+    y:{type:'linear',position:'left',ticks:{color:'#3fb950',font:{size:9}}},
+    y1:{type:'linear',position:'right',grid:{drawOnChartArea:false},ticks:{color:'#d2a8ff',font:{size:9}}}
+  }}});
+
+  // ── Totals bars ─────────────────────────────────────────────────────
+  const machineTons=MACHINES.map(m=>CREWS.reduce((s,c)=>s+((data[m]||{})[c]||[]).reduce((ss,r)=>ss+r.tt,0),0));
+  new Chart(sc('cMach'),chartDef('bar',MACHINES,[{label:'Total Tons',data:machineTons,backgroundColor:MCOLORS.map(c=>c+'88'),borderColor:MCOLORS,borderWidth:1}],{plugins:{legend:{display:false}},scales}));
+  const crewTons=CREWS.map(crew=>MACHINES.reduce((s,m)=>s+((data[m]||{})[crew]||[]).reduce((ss,r)=>ss+r.tt,0),0));
+  new Chart(sc('cCrew'),chartDef('bar',CREWS.map(c=>c+' Crew'),[{label:'Total Tons',data:crewTons,backgroundColor:CREWS.map(c=>CREW_COLORS[c]+'88'),borderColor:CREWS.map(c=>CREW_COLORS[c]),borderWidth:1}],{plugins:{legend:{display:false}},scales}));
+
+  // ── Cumulative lines ────────────────────────────────────────────────
+  const cumTonsDS=MACHINES.map((m,mi)=>{let cum=0;return line(m,Array.from({length:maxRots},(_,i)=>{cum+=CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tt??0),0);return n1(cum);}),MCOLORS[mi%MCOLORS.length]);});
+  new Chart(sc('cCumTons'),chartDef('line',rotLabels,cumTonsDS,{scales}));
+  const cumTpfDS=MACHINES.map((m,mi)=>{let cum=0;return{...line(m,Array.from({length:maxRots},(_,i)=>{const tt=CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tt??0),0);const tf=CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tf??0),0);if(tf>0)cum+=n1(tt/tf);return n1(cum);}),MCOLORS[mi%MCOLORS.length]),spanGaps:true};});
+  new Chart(sc('cCumTpf'),chartDef('line',rotLabels,cumTpfDS,{scales}));
+
+  // ── Running avg per machine ─────────────────────────────────────────
+  const avgTonsDS=MACHINES.map((m,mi)=>{
+    const vals=Array.from({length:maxRots},(_,i)=>CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tt??0),0));
+    return line(m,vals.map((_,i)=>n1(vals.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1))),MCOLORS[mi%MCOLORS.length]);
+  });
+  new Chart(sc('cAvgTons'),chartDef('line',rotLabels,avgTonsDS,{scales}));
+  const avgTpfDS=MACHINES.map((m,mi)=>{
+    const vals=Array.from({length:maxRots},(_,i)=>{const tt=CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tt??0),0);const tf=CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tf??0),0);return tf>0?tt/tf:0;});
+    return line(m,vals.map((_,i)=>n1(vals.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1))),MCOLORS[mi%MCOLORS.length]);
+  });
+  new Chart(sc('cAvgTpf'),chartDef('line',rotLabels,avgTpfDS,{scales}));
+
+  // ── Per-machine bar+avg (tons & tpf) ────────────────────────────────
+  MACHINES.forEach((m,mi)=>{
+    const col=MCOLORS[mi%MCOLORS.length];
+    const labels=rotLabels;
+    const rotT=Array.from({length:maxRots},(_,i)=>CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tt??0),0));
+    const avgT=rotT.map((_,i)=>n1(rotT.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1)));
+    new Chart(sc('cMR_'+m),{type:'bar',data:{labels,datasets:[bar('Tons',rotT,col),{...line('Avg',avgT,'#ffd700'),order:1}]},options:{responsive:true,plugins:{legend:{display:true,labels:{font:{size:9},boxWidth:10}}},scales}});
+    const rotTpf=Array.from({length:maxRots},(_,i)=>{const tt=CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tt??0),0);const tf=CREWS.reduce((s,c)=>s+(((data[m]||{})[c]||[])[i]?.tf??0),0);return tf>0?n1(tt/tf):0;});
+    const avgTpf2=rotTpf.map((_,i)=>n1(rotTpf.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1)));
+    new Chart(sc('cTF_'+m),{type:'bar',data:{labels,datasets:[bar('T/F',rotTpf,col),{...line('Avg',avgTpf2,'#ffd700'),order:1}]},options:{responsive:true,plugins:{legend:{display:true,labels:{font:{size:9},boxWidth:10}}},scales}});
+  });
+
+  // ── Per-machine per-crew detail charts ──────────────────────────────
+  MACHINES.forEach((m,mi)=>{
+    const col=MCOLORS[mi%MCOLORS.length];
+    CREWS.forEach((crew,ci)=>{
+      const rots=((rotData[m]||{})[crew]||{}).rotations||[];
+      if(!rots.length)return;
+      const labels=rots.map((_,i)=>'R'+(i+1));
+      const tons=rots.map(r=>r.total_tons);
+      const tpf=rots.map(r=>r.total_faults>0?n1(r.tons_per_fault):0);
+      const avgTons=tons.map((_,i)=>n1(tons.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1)));
+      const avgTpf=tpf.map((_,i)=>n1(tpf.slice(0,i+1).reduce((s,v)=>s+v,0)/(i+1)));
+      let cum=0;
+      const cumT=tons.map(t=>{cum+=t;return n1(cum);});
+      const crewCol=[CREW_COLORS.B,CREW_COLORS.D,CREW_COLORS.C,CREW_COLORS.A][ci];
+      const el1=sc('cD_'+m+'_'+crew+'_tons');const el2=sc('cD_'+m+'_'+crew+'_tpf');const el3=sc('cD_'+m+'_'+crew+'_cum');
+      if(el1) new Chart(el1,{type:'bar',data:{labels,datasets:[bar('Tons',tons,crewCol),{...line('Avg',avgTons,'#ffd700'),order:1}]},options:{responsive:true,plugins:{legend:{display:true,labels:{font:{size:8},boxWidth:8}}},scales}});
+      if(el2) new Chart(el2,{type:'bar',data:{labels,datasets:[bar('T/F',tpf,crewCol),{...line('Avg',avgTpf,'#ffd700'),order:1}]},options:{responsive:true,plugins:{legend:{display:true,labels:{font:{size:8},boxWidth:8}}},scales}});
+      if(el3) new Chart(el3,chartDef('line',labels,[line('Cum Tons',cumT,crewCol,true)],{plugins:{legend:{display:false}},scales}));
+    });
+  });
+  if(${autoPrint}){setTimeout(()=>window.print(),1200);}
+})();
+<\/script>
+</body></html>`;
+
+    const blob = new Blob([html], {type: 'text/html'});
+    const url  = URL.createObjectURL(blob);
+    if (autoPrint) {
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } else {
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `mining-snapshot-${new Date().toISOString().slice(0,10)}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
+function chartOpts() {
+  return {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks:{color:'#8b949e',font:{size:10}}, grid:{color:'#21262d'} },
+      y: { ticks:{color:'#8b949e',font:{size:10}}, grid:{color:'#21262d'} }
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Modal: Add / Edit
+// ═══════════════════════════════════════════════════════════════════════
+function openModal() {
+  document.getElementById('modalTitle').textContent = 'Add Shift';
+  document.getElementById('editId').value = '';
+  document.getElementById('fMachine').value = S.machine !== 'COMBINED' ? S.machine : 'CM02';
+  document.getElementById('fCrew').value    = ['B','D','C','A'].includes(S.crew) ? S.crew : 'B';
+  document.getElementById('fDate').value    = '2026-01-01';
+  document.getElementById('fShift').value   = 'DS';
+  document.getElementById('fTons').value    = '';
+  document.getElementById('faultBody').innerHTML = '';
+  document.getElementById('btnSaveContinue').style.display = '';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function editShift(id) {
+  let found = null;
+  for (const rot of S.rotations) {
+    found = rot.shifts.find(s => s.id === id);
+    if (found) break;
+  }
+  if (!found) return;
+
+  document.getElementById('modalTitle').textContent = 'Edit Shift';
+  document.getElementById('editId').value     = id;
+  document.getElementById('fMachine').value   = S.machine;
+  document.getElementById('fCrew').value      = S.crew;
+  document.getElementById('fDate').value      = found.date;
+  document.getElementById('fShift').value     = found.shift;
+  document.getElementById('fTons').value      = found.tons;
+  document.getElementById('faultBody').innerHTML = '';
+  for (const [code, count] of Object.entries(found.faults)) {
+    addFaultRow(code, count);
+  }
+  document.getElementById('btnSaveContinue').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function addFaultRow(code='', count='') {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" placeholder="e.g. M2255" value="${code}"
+         style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></td>
+    <td><input type="number" placeholder="1" min="1" value="${count}" style="width:100%"></td>
+    <td><button class="rm" onclick="this.closest('tr').remove()">×</button></td>`;
+  document.getElementById('faultBody').appendChild(tr);
+}
+
+async function saveShift(andContinue = false) {
+  const machine = document.getElementById('fMachine').value;
+  const crew    = document.getElementById('fCrew').value;
+  const date    = document.getElementById('fDate').value;
+  const shift   = document.getElementById('fShift').value;
+  const tons    = parseFloat(document.getElementById('fTons').value) || 0;
+
+  if (!date) { alert('Date is required.'); return; }
+
+  const faults = {};
+  for (const tr of document.querySelectorAll('#faultBody tr')) {
+    const [codeIn, cntIn] = tr.querySelectorAll('input');
+    const code  = codeIn.value.trim().toUpperCase();
+    const count = parseInt(cntIn.value) || 0;
+    if (code && count > 0) faults[code] = count;
+  }
+
+  try {
+    const r = await fetch('/api/shift', {
+      method: 'POST',
+      headers: _writeHeaders(),
+      body: JSON.stringify({ machine, crew, date, shift, tons, faults })
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.error || r.statusText); }
+
+    // Refresh data in background
+    if (S.crew === 'ALL') loadAllCrews(); else loadShifts();
+
+    if (andContinue) {
+      // Advance to next shift: DS -> NS same date, NS -> DS next date
+      const nextShift = shift === 'DS' ? 'NS' : 'DS';
+      let   nextDate  = date;
+      if (shift === 'NS') {
+        // bump date by 1
+        const d = new Date(date + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        nextDate = d.toISOString().slice(0, 10);
+      }
+      document.getElementById('modalTitle').textContent = 'Add Shift';
+      document.getElementById('editId').value  = '';
+      document.getElementById('fDate').value   = nextDate;
+      document.getElementById('fShift').value  = nextShift;
+      document.getElementById('fTons').value   = '';
+      document.getElementById('faultBody').innerHTML = '';
+      // Flash the date field so user notices it changed
+      const df = document.getElementById('fDate');
+      df.style.outline = '2px solid var(--accent2)';
+      setTimeout(() => df.style.outline = '', 800);
+    } else {
+      closeModal();
+    }
+  } catch(e) {
+    alert('Error saving shift: ' + e.message);
+  }
+}
+
+async function delShift(id) {
+  if (!confirm('Delete this shift entry?')) return;
+  try {
+    const r = await fetch(`/api/shift/${id}`, { method: 'DELETE', headers: _writeHeaders() });
+    if (!r.ok) throw new Error(r.statusText);
+    if (S.crew === 'ALL') loadAllCrews(); else loadShifts();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function clearCrewData() {
+  if (S.crew === 'ALL' || S.machine === 'COMBINED') {
+    alert('Select a specific crew tab first, then click Clear Crew Data.');
+    return;
+  }
+  const msg = `This will permanently delete ALL shifts and faults for\n\n  Machine: ${S.machine}  |  Crew: ${S.crew}\n\nType DELETE to confirm.`;
+  if (prompt(msg) !== 'DELETE') return;
+  try {
+    const r = await fetch(`/api/shifts?machine=${S.machine}&crew=${S.crew}`, { method: 'DELETE', headers: _writeHeaders() });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    alert(`Cleared: ${j.deleted_shifts} shift(s) and ${j.deleted_faults} fault record(s) removed.`);
+    loadShifts();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function importFromExcel() {
+  const btn = document.getElementById('btnImportExcel');
+  const orig = btn.textContent;
+  if (!confirm('Import ALL shift and fault data from\n"Faults vs Tons 2026.xlsx"\n\nExisting records will be overwritten with the Excel values.\nContinue?')) return;
+  btn.textContent = '⏳ Importing…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/import-excel', { method: 'POST', headers: _writeHeaders() });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    alert(`✅ Excel import complete!\n\n${j.imported.toLocaleString()} shift records imported.`);
+    if (S.crew === 'ALL') loadAllCrews(); else loadShifts();
+  } catch(e) {
+    alert('❌ Import failed: ' + e.message);
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════════
+function n1(v) {
+  if (v == null || v === 0) return '0';
+  return Number(v).toLocaleString('en', {maximumFractionDigits: 1});
+}
+function n2(v) {
+  if (v == null || v === 0) return '0';
+  return Number(v).toLocaleString('en', {maximumFractionDigits: 2});
+}
+function abbr(code) {
+  // Shorten long fault codes for table header
+  return code.length > 6 ? code.slice(0, 6) + '…' : code;
+}
+function setContainer(id, html) {
+  document.getElementById(id).innerHTML = html;
+}
+function toggleRot(el) {
+  const body = el.nextElementSibling;
+  body.style.display = body.style.display === 'none' ? '' : 'none';
+}
+
+// Close modal on background click
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+// ── Initial load ──────────────────────────────────────────────────────
+_applyReadonly();
+loadInvestmentPerformance();
+loadShifts();
+loadInfluencerData();
+setInterval(() => {
+  loadInvestmentPerformance();
+}, 120000);
+setInterval(() => {
+  loadInfluencerData();
+}, 300000); // refresh influencer data every 5 minutes
+
+// ── Crypto Influencer Monitor ─────────────────────────────────────────
+async function loadInfluencerData() {
+  const banner = document.getElementById('infGlobalBanner');
+  const grid   = document.getElementById('infSymbolGrid');
+  const meta   = document.getElementById('infMeta');
+  try {
+    const r = await fetch('/api/crypto-influencer');
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+
+    const g = d.influencer?.global || {};
+    const sig = g.dominant_signal || 'neutral';
+    const manip = g.manipulation_detected;
+    const coord = g.coordination_count || 0;
+
+    const sigColor = {pump:'#2ea043', dump:'#f85149', fud:'#d29922', neutral:'#8b949e'}[sig] || '#8b949e';
+    banner.style.borderColor = sigColor;
+    banner.innerHTML = `
+      <span style="color:${sigColor};font-weight:600;font-size:14px;text-transform:uppercase">${sig === 'pump' ? '📈 PUMP' : sig === 'dump' ? '📉 DUMP' : sig === 'fud' ? '⚠️ FUD' : '⚪ NEUTRAL'}</span>
+      &nbsp;&nbsp;
+      ${manip ? '<span style="background:#f85149;color:#fff;border-radius:3px;padding:1px 7px;font-size:11px">MANIPULATION DETECTED</span>' : ''}
+      ${coord > 0 ? `<span style="background:#d29922;color:#000;border-radius:3px;padding:1px 7px;font-size:11px;margin-left:4px">COORDINATED (${coord})</span>` : ''}
+      &nbsp; Influencers active: <strong>${g.influencer_count || 0}</strong>
+      &nbsp; Avg net signal: <strong style="color:${(g.avg_net_signal||0) > 0 ? '#2ea043' : (g.avg_net_signal||0) < 0 ? '#f85149' : '#8b949e'}">${(g.avg_net_signal||0).toFixed(2)}</strong>
+    `;
+
+    // per-symbol cards
+    const bySym = d.influencer?.by_symbol || {};
+    grid.innerHTML = '';
+    for (const [sym, s] of Object.entries(bySym)) {
+      const net = s.net_signal || 0;
+      const netColor = net > 0 ? '#2ea043' : net < 0 ? '#f85149' : '#8b949e';
+      const manipFlag = s.manipulation_flag ? `<span style="background:#f85149;color:#fff;padding:1px 5px;border-radius:3px;font-size:10px">MANIP</span>` : '';
+      const coordFlag = s.coordination ? `<span style="background:#d29922;color:#000;padding:1px 5px;border-radius:3px;font-size:10px">COORD</span>` : '';
+      grid.insertAdjacentHTML('beforeend', `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong style="font-size:13px">${sym}/USD</strong>
+            <span style="color:${netColor};font-weight:700;font-size:14px">${net > 0 ? '+' : ''}${net.toFixed(1)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">
+            Pump: <span style="color:#2ea043">${(s.pump_score||0).toFixed(1)}</span> &nbsp;
+            Dump: <span style="color:#f85149">${(s.dump_score||0).toFixed(1)}</span> &nbsp;
+            FUD: <span style="color:#d29922">${(s.fud_score||0).toFixed(1)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">
+            Manip score: <strong style="color:${(s.manipulation_score||0)>0?'#f85149':'#8b949e'}">${(s.manipulation_score||0).toFixed(2)}</strong>
+            &nbsp;${manipFlag}${coordFlag}
+          </div>
+          ${s.top_influencers?.length ? `<div style="font-size:10px;color:#8b949e">Actors: ${s.top_influencers.join(', ')}</div>` : ''}
+          ${s.sample_headlines?.length ? `<div style="font-size:10px;color:#8b949e;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${s.sample_headlines[0]}">"${s.sample_headlines[0].substring(0,80)}…"</div>` : ''}
+        </div>
+      `);
+    }
+    if (!Object.keys(bySym).length) {
+      grid.innerHTML = '<div style="color:var(--muted);font-size:12px">No active influencer signals detected in current search window.</div>';
+    }
+
+    // pump-ride trades
+    const pumps = d.pump_trades || [];
+    const pumpSec = document.getElementById('infPumpTradesSection');
+    if (pumps.length > 0) {
+      pumpSec.style.display = '';
+      const tbody = document.getElementById('infPumpTradesTbody');
+      tbody.innerHTML = pumps.slice(-10).reverse().map(t => {
+        const pnlColor = (t.pnl||0) >= 0 ? '#2ea043' : '#f85149';
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:4px 8px">${t.symbol}</td>
+          <td style="padding:4px 8px;color:var(--muted)">${(t.entry_time||'').substring(0,16)}</td>
+          <td style="padding:4px 8px;color:var(--muted)">${(t.exit_time||'').substring(0,16)}</td>
+          <td style="padding:4px 8px;text-align:right;color:${pnlColor}">${(t.pnl||0) >= 0 ? '+' : ''}$${(t.pnl||0).toFixed(2)}</td>
+          <td style="padding:4px 8px;color:var(--muted)">${t.influencer_actors||''}</td>
+        </tr>`;
+      }).join('');
+    } else {
+      pumpSec.style.display = 'none';
+    }
+
+    // research headlines
+    const headlines = d.research_headlines || [];
+    const rSec = document.getElementById('infResearchSection');
+    if (headlines.length > 0) {
+      rSec.style.display = '';
+      document.getElementById('infResearchList').innerHTML = headlines.map(h =>
+        `<li style="padding:3px 0;border-bottom:1px solid var(--border);color:#cdd9e5">
+          <span style="color:var(--accent);font-weight:600;min-width:40px;display:inline-block">${Math.round((h.probability||0)*100)}%</span>
+          ${h.title}
+        </li>`
+      ).join('');
+    } else {
+      rSec.style.display = 'none';
+    }
+
+    meta.textContent = `Last updated: ${new Date(d.as_of).toLocaleTimeString()}`;
+  } catch(e) {
+    banner.innerHTML = `<span style="color:var(--muted)">Influencer data unavailable (${e.message}). Bot may not have run yet.</span>`;
+  }
+}
+</script>
+<!-- ── Import Fault Log Modal ──────────────────────────────────────────── -->
+<div class="modal-overlay" id="importOverlay">
+  <div class="modal" style="max-width:600px">
+    <h2>📥 Import Fault Log</h2>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:14px;line-height:1.6">
+      Paste or type a timestamped fault log below.<br>
+      Each line: &nbsp;<code style="background:var(--surface2);padding:1px 5px;border-radius:3px">timestamp, FAULT_CODE</code>
+      &nbsp; — timestamp can be <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">YYYY-MM-DD HH:MM</code> or <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">DD/MM/YYYY HH:MM:SS</code><br>
+      Faults are automatically allocated to <strong>DS (06:00–18:00)</strong> or <strong>NS (18:00–06:00)</strong>.
+    </p>
+
+    <div class="form-grid" style="margin-bottom:10px;grid-template-columns:1fr 1fr 1fr">
+      <div class="form-group">
+        <label>Machine</label>
+        <select id="iMachine">
+          <option>CM02</option><option>CM03</option><option>CM05</option>
+          <option>CM07</option><option>CM08</option><option>CM09</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Crew</label>
+        <select id="iCrew">
+          <option value="B">B Crew</option>
+          <option value="D">D Crew</option>
+          <option value="C">C Crew</option>
+          <option value="A">A Crew</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Import Shifts</label>
+        <select id="iShiftFilter">
+          <option value="DS">Day Shift (DS) only</option>
+          <option value="NS">Night Shift (NS) only</option>
+          <option value="BOTH">Both DS &amp; NS</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Fault Log (paste text, drop a CSV/TXT, or click to browse)</label>
+      <!-- Drop zone -->
+      <div id="dropZone" style="
+        border:2px dashed var(--border);
+        border-radius:8px;
+        padding:14px 12px 8px;
+        background:var(--surface2);
+        cursor:pointer;
+        transition:border-color 0.15s, background 0.15s;
+      " onclick="document.getElementById('fileInput').click()"
+         ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">
+        <div id="dropHint" style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:8px;pointer-events:none">
+          📂 Drop CSV / TXT here &nbsp;or&nbsp; <span style="color:var(--accent2);text-decoration:underline">click to browse</span>
+        </div>
+        <textarea id="iText" rows="12" placeholder="2026-01-07 14:32, M2255&#10;2026-01-07 15:44, CO101&#10;2026-01-07 19:10, M2255&#10;2026-01-08 02:30, HYD03&#10;..." onclick="event.stopPropagation()" style="
+          background:transparent;
+          border:none;
+          border-top:1px solid var(--border);
+          border-radius:0;
+          color:var(--text);
+          font-family:monospace;
+          font-size:12px;
+          padding:8px 0 0;
+          width:100%;
+          resize:vertical;
+          outline:none;
+          display:block;
+        "></textarea>
+      </div>
+      <input type="file" id="fileInput" accept=".csv,.txt,.log" multiple style="display:none" onchange="loadFiles(this.files)">
+      <div id="fileNames" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+    </div>
+
+    <div id="importResult" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:6px;font-size:12px;line-height:1.7"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeImportModal()">Close</button>
+      <button class="btn btn-primary" onclick="runImport()">⚡ Allocate &amp; Import</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Drop zone ─────────────────────────────────────────────────────────────
+function dzOver(e) {
+  e.preventDefault();
+  const dz = document.getElementById('dropZone');
+  dz.style.borderColor = 'var(--accent2)';
+  dz.style.background  = 'rgba(56,139,253,0.07)';
+}
+function dzLeave(e) {
+  const dz = document.getElementById('dropZone');
+  dz.style.borderColor = 'var(--border)';
+  dz.style.background  = 'var(--surface2)';
+}
+function dzDrop(e) {
+  e.preventDefault();
+  dzLeave(e);
+  loadFiles(e.dataTransfer.files);
+}
+function loadFiles(files) {
+  if (!files || !files.length) return;
+  const names = [];
+  let pending  = files.length;
+  let combined = '';
+
+  Array.from(files).forEach(file => {
+    names.push(file.name);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      combined += (combined ? '\n' : '') + ev.target.result;
+      pending--;
+      if (pending === 0) {
+        document.getElementById('iText').value = combined;
+        document.getElementById('fileNames').textContent =
+          '📎 ' + names.join(', ');
+        document.getElementById('importResult').style.display = 'none';
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+// ── Import modal ──────────────────────────────────────────────────────────
+function openImportModal() {
+  const machine = S.machine !== 'COMBINED' ? S.machine : 'CM02';
+  const crew    = ['B','D','C','A'].includes(S.crew) ? S.crew : 'B';
+  document.getElementById('iMachine').value     = machine;
+  document.getElementById('iCrew').value        = crew;
+  document.getElementById('iShiftFilter').value = 'DS';  // default to DS
+  document.getElementById('iText').value    = '';
+  document.getElementById('fileNames').textContent = '';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('importResult').style.display = 'none';
+  document.getElementById('importOverlay').classList.add('open');
+}
+
+function closeImportModal() {
+  document.getElementById('importOverlay').classList.remove('open');
+}
+
+async function runImport() {
+  const machine     = document.getElementById('iMachine').value;
+  const crew        = document.getElementById('iCrew').value;
+  const shiftFilter = document.getElementById('iShiftFilter').value;
+  const text        = document.getElementById('iText').value.trim();
+  if (!text) { alert('Paste some fault log data first.'); return; }
+
+  const res = document.getElementById('importResult');
+  res.style.display = '';
+  res.style.background = 'var(--surface2)';
+  res.style.color = 'var(--muted)';
+  res.textContent = 'Importing…';
+
+  try {
+    const r = await fetch('/api/import-faults', {
+      method: 'POST',
+      headers: _writeHeaders(),
+      body: JSON.stringify({ machine, crew, text, shift_filter: shiftFilter })
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      res.style.background = '#f8514922';
+      res.style.color = 'var(--danger)';
+      res.innerHTML = `<strong>Error:</strong> ${d.error}<br>${(d.details||[]).join('<br>')}`;
+      return;
+    }
+
+    let html = `<strong style="color:var(--success)">✓ Imported ${d.faults_parsed} fault events across ${d.shifts_updated.length} shift(s)</strong><br><br>`;
+    if (d.shifts_updated.length) {
+      html += '<strong>Shifts updated:</strong><br>';
+      for (const s of d.shifts_updated) {
+        html += `&nbsp;• ${s.date} — ${s.shift === 'DS' ? '☀ DS' : '🌙 NS'}<br>`;
+      }
+    }
+    const skipped = (d.warnings || []).filter(w => w.includes('No') && w.includes('shift found'));
+    const other   = (d.warnings || []).filter(w => !w.includes('No') || !w.includes('shift found'));
+    if (skipped.length) {
+      html += `<br><strong style="color:var(--warning)">⚠ ${skipped.length} date(s) skipped — no matching shift in DB:</strong><br>`;
+      html += skipped.map(w => `&nbsp;• ${w}`).join('<br>');
+      html += `<br><span style="color:var(--muted);font-size:11px">Add these shifts via <strong>+ Add Shift</strong> first, then re-import.</span>`;
+    }
+    if (other.length) {
+      html += `<br><strong style="color:var(--warning)">Other warnings (${other.length}):</strong><br>`;
+      html += other.map(w => `&nbsp;• ${w}`).join('<br>');
+    }
+    res.style.background = '#3fb95012';
+    res.style.color = 'var(--text)';
+    res.innerHTML = html;
+
+    // Refresh active view
+    if (S.machine === machine) {
+      if (S.crew === crew) loadShifts();
+      else if (S.crew === 'ALL') loadAllCrews();
+    }
+  } catch(e) {
+    res.style.background = '#f8514922';
+    res.style.color = 'var(--danger)';
+    res.textContent = 'Error: ' + e.message;
+  }
+}
+
+document.getElementById('importOverlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeImportModal();
+});
+</script>
+
+</body>
+</html>

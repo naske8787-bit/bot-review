@@ -1,0 +1,17 @@
+[Unit]
+Description=Capitol Trades Trading Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=REPLACE_WITH_LINUX_USERNAME
+WorkingDirectory=/absolute/path/to/Capitol_Trades_API/trading_bot
+Environment=PYTHON_BIN=/absolute/path/to/Capitol_Trades_API/trading_bot/.venv/bin/python
+ExecStart=/usr/bin/bash /absolute/path/to/Capitol_Trades_API/trading_bot/supervise_bot.sh
+Restart=always
+RestartSec=10
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

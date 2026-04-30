@@ -1,0 +1,9 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python.defaultInterpreterPath": "/home/codespace/.python/current/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "task.allowAutomaticTasks": "on",
+    "githubPullRequests.remotes": [
+        "origin"
+    ]
+}

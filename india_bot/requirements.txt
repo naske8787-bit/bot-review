@@ -1,0 +1,7 @@
+ib_insync
+yfinance
+pandas
+numpy
+python-dotenv
+pytz
+requests

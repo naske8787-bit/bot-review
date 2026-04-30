@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Motor Runtime Gantt</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #111827;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --track: #1f2937;
+            --line: #334155;
+            --label-width: 170px;
+            --ticks-left: 180px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: radial-gradient(circle at top, #1e293b 0%, var(--bg) 65%);
+            color: var(--text);
+            padding: 22px;
+        }
+        .card {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: color-mix(in oklab, var(--panel) 92%, black);
+            border: 1px solid #243244;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+        }
+        h1 { margin: 0 0 6px; font-size: 1.35rem; }
+        .meta { color: var(--muted); margin-bottom: 16px; }
+        .controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .zoom-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .zoom-group label {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        .zoom-group input[type="range"] {
+            width: 220px;
+            accent-color: #38bdf8;
+        }
+        .zoom-button {
+            appearance: none;
+            border: 1px solid #314255;
+            background: #172131;
+            color: var(--text);
+            border-radius: 6px;
+            min-width: 38px;
+            height: 34px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .zoom-button:hover {
+            background: #1d2a3d;
+        }
+        .zoom-readout {
+            color: #cbd5e1;
+            font-variant-numeric: tabular-nums;
+            min-width: 48px;
+        }
+        .controls-hint {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        .comparison-panel {
+            border: 1px solid #243244;
+            background: rgba(15, 23, 42, 0.65);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .comparison-header {
+            margin-bottom: 10px;
+        }
+        .comparison-header h2 {
+            margin: 0 0 4px;
+            font-size: 1rem;
+        }
+        .comparison-subtitle {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        .comparison-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .comparison-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 220px;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        .comparison-field select {
+            appearance: none;
+            background: #172131;
+            color: var(--text);
+            border: 1px solid #314255;
+            border-radius: 8px;
+            padding: 9px 12px;
+        }
+        .comparison-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .comparison-pill {
+            border: 1px solid #243244;
+            background: #111827;
+            padding: 10px 12px;
+            border-radius: 10px;
+        }
+        .comparison-pill span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+        .comparison-pill strong {
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+        .timeline-viewport {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 6px;
+        }
+        .timeline-canvas {
+            min-width: 100%;
+        }
+        .timeline { position: relative; border-top: 1px solid var(--line); padding-top: 34px; }
+        .ticks { position: absolute; left: var(--ticks-left); right: 0; top: 0; height: 30px; }
+        .cursor-label {
+            position: absolute;
+            top: 4px;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.94);
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 8;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
+        }
+        .tick {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--line);
+        }
+        .tick span {
+            position: absolute;
+            top: -2px;
+            transform: translateX(-50%);
+            color: var(--muted);
+            font-size: 11px;
+            white-space: nowrap;
+            background: var(--panel);
+            padding: 0 3px;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: var(--label-width) 1fr;
+            gap: 10px;
+            align-items: center;
+            min-height: 44px;
+        }
+        .label {
+            text-align: right;
+            color: #cbd5e1;
+            font-weight: 600;
+            padding-right: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .track {
+            position: relative;
+            height: 22px;
+            background: var(--track);
+            border-radius: 0;
+            overflow: hidden;
+            border: 1px solid #273548;
+        }
+        .cursor-line {
+            position: absolute;
+            top: -1px;
+            bottom: -1px;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.7);
+            transform: translateX(-1px);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+        .bar {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            border-radius: 0;
+            opacity: 0.95;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            z-index: 2;
+        }
+        .tick.cursor-active {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        .controls-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+        .pdf-button {
+            appearance: none;
+            border: 1px solid #38bdf8;
+            background: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+            border-radius: 6px;
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        .pdf-button:hover {
+            background: rgba(56, 189, 248, 0.22);
+        }
+        @media print {
+            @page { size: A4 landscape; margin: 12mm 10mm; }
+            body {
+                background: #fff !important;
+                color: #111 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .card {
+                max-width: 100% !important;
+                background: #fff !important;
+                border: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                padding: 0 !important;
+            }
+            h1 { color: #111 !important; }
+            .meta { color: #555 !important; }
+            #zoom-controls, .comparison-controls, .comparison-subtitle { display: none !important; }
+            .comparison-panel {
+                border: 1px solid #ccc !important;
+                background: #f9fafb !important;
+                border-radius: 6px !important;
+            }
+            .comparison-header h2 { color: #111 !important; }
+            .comparison-pill {
+                border: 1px solid #ccc !important;
+                background: #f3f4f6 !important;
+            }
+            .comparison-pill span { color: #555 !important; }
+            .comparison-pill strong { color: #111 !important; }
+            .timeline-viewport {
+                overflow: visible !important;
+            }
+            .timeline-canvas {
+                width: 100% !important;
+            }
+            .cursor-line, #cursor-label { display: none !important; }
+            .track {
+                background: #e5e7eb !important;
+                border-color: #d1d5db !important;
+            }
+            .label { color: #111 !important; }
+            .tick { background: #cbd5e1 !important; }
+            .tick span { color: #555 !important; background: #fff !important; }
+        }
+        .empty {
+            color: #fca5a5;
+            border: 1px solid #7f1d1d;
+            background: rgba(127, 29, 29, 0.2);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+        }
+        @media (max-width: 900px) {
+            :root {
+                --label-width: 120px;
+                --ticks-left: 130px;
+            }
+            .label { font-size: 0.85rem; }
+            .tick span { font-size: 10px; }
+            .controls { align-items: flex-start; }
+            .zoom-group input[type="range"] { width: 160px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Motor Runtime Gantt</h1>
+        <div class="meta">Window: 2025-11-20T06:19:48+00:00 to 2025-11-21T01:53:42+00:00</div>
+        
+        <div class="comparison-panel">
+            <div class="comparison-header">
+                <h2>Motor Comparison</h2>
+                <div class="comparison-subtitle">Compare runtime overlap between any two motors in the current window.</div>
+            </div>
+            <div class="comparison-controls">
+                <label class="comparison-field">
+                    <span>Motor 1</span>
+                    <select id="compare-motor-a"><option value="Cutter Motors Under Load">Cutter Motors Under Load</option><option value="Dust Fan Motor">Dust Fan Motor</option><option value="Left Cutter Motor">Left Cutter Motor</option><option value="Right Cutter Motor">Right Cutter Motor</option></select>
+                </label>
+                <label class="comparison-field">
+                    <span>Motor 2</span>
+                    <select id="compare-motor-b"><option value="Cutter Motors Under Load">Cutter Motors Under Load</option><option value="Dust Fan Motor">Dust Fan Motor</option><option value="Left Cutter Motor">Left Cutter Motor</option><option value="Right Cutter Motor">Right Cutter Motor</option></select>
+                </label>
+            </div>
+            <div class="comparison-stats" id="comparison-stats"></div>
+        </div>
+        
+        <div class="controls" id="zoom-controls">
+            <div class="zoom-group">
+                <button type="button" class="zoom-button" id="zoom-out">-</button>
+                <label for="zoom-slider">Zoom</label>
+                <input id="zoom-slider" type="range" min="1" max="12" step="0.5" value="1" />
+                <button type="button" class="zoom-button" id="zoom-in">+</button>
+                <button type="button" class="zoom-button" id="zoom-reset">Fit</button>
+                <span class="zoom-readout" id="zoom-readout">100%</span>
+            </div>
+            <div class="controls-right">
+                <button type="button" class="pdf-button" id="export-pdf" onclick="window.print()">&#128438; Download PDF</button>
+                <div class="controls-hint">Drag the slider or use Ctrl + mouse wheel over the chart to zoom the timeline.</div>
+            </div>
+        </div>
+        <div class="timeline-viewport" id="timeline-viewport"><div class="timeline-canvas" id="timeline-canvas"><div class="timeline"><div class="ticks"><div class="tick" style="left:3.4245%"><span>2025-11-20 07:00</span></div><div class="tick" style="left:8.5357%"><span>2025-11-20 08:00</span></div><div class="tick" style="left:13.6468%"><span>2025-11-20 09:00</span></div><div class="tick" style="left:18.7580%"><span>2025-11-20 10:00</span></div><div class="tick" style="left:23.8692%"><span>2025-11-20 11:00</span></div><div class="tick" style="left:28.9803%"><span>2025-11-20 12:00</span></div><div class="tick" style="left:34.0915%"><span>2025-11-20 13:00</span></div><div class="tick" style="left:39.2027%"><span>2025-11-20 14:00</span></div><div class="tick" style="left:44.3138%"><span>2025-11-20 15:00</span></div><div class="tick" style="left:49.4250%"><span>2025-11-20 16:00</span></div><div class="tick" style="left:54.5362%"><span>2025-11-20 17:00</span></div><div class="tick" style="left:59.6473%"><span>2025-11-20 18:00</span></div><div class="tick" style="left:64.7585%"><span>2025-11-20 19:00</span></div><div class="tick" style="left:69.8697%"><span>2025-11-20 20:00</span></div><div class="tick" style="left:74.9808%"><span>2025-11-20 21:00</span></div><div class="tick" style="left:80.0920%"><span>2025-11-20 22:00</span></div><div class="tick" style="left:85.2032%"><span>2025-11-20 23:00</span></div><div class="tick" style="left:90.3143%"><span>2025-11-21 00:00</span></div><div class="tick" style="left:95.4255%"><span>2025-11-21 01:00</span></div></div><div class="cursor-label" id="cursor-label"></div><div class="row"><div class="label">Cutter Motors Under Load</div><div class="track"><div class="cursor-line"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T06:20:02+00:00 -&gt; 2025-11-20T06:35:08+00:00" style="left:0.0199%; width:1.2863%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T06:37:36+00:00 -&gt; 2025-11-20T07:06:32+00:00" style="left:1.5163%; width:2.4647%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T07:08:07+00:00 -&gt; 2025-11-20T07:09:47+00:00" style="left:4.1159%; width:0.1420%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T07:12:30+00:00 -&gt; 2025-11-20T07:27:21+00:00" style="left:4.4893%; width:1.2650%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T07:30:42+00:00 -&gt; 2025-11-20T07:36:40+00:00" style="left:6.0397%; width:0.5083%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T07:41:03+00:00 -&gt; 2025-11-20T07:50:10+00:00" style="left:6.9214%; width:0.7766%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T07:51:51+00:00 -&gt; 2025-11-20T07:54:47+00:00" style="left:7.8414%; width:0.2499%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T07:57:35+00:00 -&gt; 2025-11-20T08:05:47+00:00" style="left:8.3298%; width:0.6985%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T08:07:20+00:00 -&gt; 2025-11-20T08:10:00+00:00" style="left:9.1603%; width:0.2272%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T09:31:34+00:00 -&gt; 2025-11-20T09:33:09+00:00" style="left:16.3359%; width:0.1349%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T09:37:09+00:00 -&gt; 2025-11-20T09:38:40+00:00" style="left:16.8115%; width:0.1292%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T09:43:21+00:00 -&gt; 2025-11-20T09:56:02+00:00" style="left:17.3396%; width:1.0804%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T12:10:19+00:00 -&gt; 2025-11-20T12:19:10+00:00" style="left:29.8592%; width:0.7539%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T12:24:16+00:00 -&gt; 2025-11-20T12:27:59+00:00" style="left:31.0475%; width:0.3166%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T12:31:40+00:00 -&gt; 2025-11-20T12:38:43+00:00" style="left:31.6779%; width:0.6006%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T12:56:52+00:00 -&gt; 2025-11-20T13:11:37+00:00" style="left:33.8246%; width:1.2565%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T13:13:29+00:00 -&gt; 2025-11-20T13:26:57+00:00" style="left:35.2401%; width:1.1472%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T13:29:34+00:00 -&gt; 2025-11-20T13:33:17+00:00" style="left:36.6102%; width:0.3166%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T13:36:59+00:00 -&gt; 2025-11-20T13:46:00+00:00" style="left:37.2420%; width:0.7681%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T14:00:57+00:00 -&gt; 2025-11-20T14:12:42+00:00" style="left:39.2836%; width:1.0009%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T14:19:56+00:00 -&gt; 2025-11-20T14:53:19+00:00" style="left:40.9007%; width:2.8438%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T15:01:19+00:00 -&gt; 2025-11-20T15:11:39+00:00" style="left:44.4260%; width:0.8803%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T15:15:48+00:00 -&gt; 2025-11-20T15:22:17+00:00" style="left:45.6598%; width:0.5523%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T15:25:40+00:00 -&gt; 2025-11-20T15:36:20+00:00" style="left:46.5003%; width:0.9087%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T15:38:57+00:00 -&gt; 2025-11-20T15:44:38+00:00" style="left:47.6318%; width:0.4841%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T15:46:37+00:00 -&gt; 2025-11-20T15:49:23+00:00" style="left:48.2849%; width:0.2357%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T20:32:24+00:00 -&gt; 2025-11-20T20:34:36+00:00" style="left:72.6297%; width:0.1874%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T20:37:09+00:00 -&gt; 2025-11-20T20:39:57+00:00" style="left:73.0343%; width:0.2385%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T20:41:55+00:00 -&gt; 2025-11-20T20:45:12+00:00" style="left:73.4404%; width:0.2797%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T20:48:54+00:00 -&gt; 2025-11-20T20:49:38+00:00" style="left:74.0353%; width:0.0625%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T20:53:42+00:00 -&gt; 2025-11-20T20:56:23+00:00" style="left:74.4442%; width:0.2286%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T20:58:00+00:00 -&gt; 2025-11-20T20:58:45+00:00" style="left:74.8105%; width:0.0639%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:02:18+00:00 -&gt; 2025-11-20T21:03:28+00:00" style="left:75.1768%; width:0.0994%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:05:04+00:00 -&gt; 2025-11-20T21:05:38+00:00" style="left:75.4124%; width:0.0483%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:08:09+00:00 -&gt; 2025-11-20T21:08:28+00:00" style="left:75.6751%; width:0.0270%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:15:07+00:00 -&gt; 2025-11-20T21:16:34+00:00" style="left:76.2686%; width:0.1235%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:19:14+00:00 -&gt; 2025-11-20T21:19:32+00:00" style="left:76.6192%; width:0.0256%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:21:17+00:00 -&gt; 2025-11-20T21:22:10+00:00" style="left:76.7939%; width:0.0752%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:24:56+00:00 -&gt; 2025-11-20T21:29:02+00:00" style="left:77.1048%; width:0.3493%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-20T21:47:50+00:00 -&gt; 2025-11-20T21:58:45+00:00" style="left:79.0556%; width:0.9299%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T00:39:48+00:00 -&gt; 2025-11-21T00:42:41+00:00" style="left:93.7047%; width:0.2456%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T00:47:57+00:00 -&gt; 2025-11-21T00:49:59+00:00" style="left:94.3990%; width:0.1732%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T00:51:44+00:00 -&gt; 2025-11-21T00:52:04+00:00" style="left:94.7213%; width:0.0284%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T00:55:04+00:00 -&gt; 2025-11-21T00:55:55+00:00" style="left:95.0053%; width:0.0724%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T00:59:45+00:00 -&gt; 2025-11-21T01:00:38+00:00" style="left:95.4042%; width:0.0752%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T01:03:37+00:00 -&gt; 2025-11-21T01:05:22+00:00" style="left:95.7336%; width:0.1491%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T01:07:15+00:00 -&gt; 2025-11-21T01:11:34+00:00" style="left:96.0431%; width:0.3677%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T01:13:30+00:00 -&gt; 2025-11-21T01:18:51+00:00" style="left:96.5755%; width:0.4557%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T01:39:06+00:00 -&gt; 2025-11-21T01:39:55+00:00" style="left:98.7563%; width:0.0696%; background:hsl(259, 66%, 54%);"></div><div class="bar" title="Cutter Motors Under Load | UNDER_LOAD | 2025-11-21T01:43:05+00:00 -&gt; 2025-11-21T01:47:40+00:00" style="left:99.0956%; width:0.3904%; background:hsl(259, 66%, 54%);"></div></div></div><div class="row"><div class="label">Dust Fan Motor</div><div class="track"><div class="cursor-line"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T06:19:48+00:00 -&gt; 2025-11-20T06:35:11+00:00" style="left:0.0000%; width:1.3104%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T06:37:22+00:00 -&gt; 2025-11-20T07:09:59+00:00" style="left:1.4964%; width:2.7785%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T07:12:16+00:00 -&gt; 2025-11-20T07:27:27+00:00" style="left:4.4694%; width:1.2934%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T07:29:58+00:00 -&gt; 2025-11-20T07:37:10+00:00" style="left:5.9772%; width:0.6133%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T07:40:02+00:00 -&gt; 2025-11-20T07:55:34+00:00" style="left:6.8348%; width:1.3232%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T07:57:21+00:00 -&gt; 2025-11-20T08:10:00+00:00" style="left:8.3099%; width:1.0776%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T09:31:33+00:00 -&gt; 2025-11-20T09:33:10+00:00" style="left:16.3344%; width:0.1377%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T09:35:51+00:00 -&gt; 2025-11-20T09:36:33+00:00" style="left:16.7007%; width:0.0596%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T09:39:22+00:00 -&gt; 2025-11-20T09:39:57+00:00" style="left:17.0003%; width:0.0497%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T09:42:46+00:00 -&gt; 2025-11-20T09:44:55+00:00" style="left:17.2899%; width:0.1832%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T09:46:26+00:00 -&gt; 2025-11-20T09:56:28+00:00" style="left:17.6023%; width:0.8547%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T12:07:41+00:00 -&gt; 2025-11-20T12:19:11+00:00" style="left:29.6348%; width:0.9796%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T12:21:48+00:00 -&gt; 2025-11-20T12:28:13+00:00" style="left:30.8374%; width:0.5466%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T12:31:09+00:00 -&gt; 2025-11-20T12:38:56+00:00" style="left:31.6339%; width:0.6630%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T12:56:02+00:00 -&gt; 2025-11-20T13:27:48+00:00" style="left:33.7536%; width:2.7061%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T13:29:20+00:00 -&gt; 2025-11-20T13:33:17+00:00" style="left:36.5903%; width:0.3365%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T13:36:13+00:00 -&gt; 2025-11-20T13:46:00+00:00" style="left:37.1766%; width:0.8334%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T14:00:57+00:00 -&gt; 2025-11-20T14:13:14+00:00" style="left:39.2836%; width:1.0464%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T14:16:23+00:00 -&gt; 2025-11-20T14:53:34+00:00" style="left:40.5983%; width:3.1675%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T15:00:59+00:00 -&gt; 2025-11-20T15:49:47+00:00" style="left:44.3976%; width:4.1571%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T20:31:10+00:00 -&gt; 2025-11-20T20:33:31+00:00" style="left:72.5246%; width:0.2002%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T20:36:41+00:00 -&gt; 2025-11-20T20:45:27+00:00" style="left:72.9946%; width:0.7468%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T20:48:40+00:00 -&gt; 2025-11-20T20:50:00+00:00" style="left:74.0154%; width:0.1136%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T20:53:04+00:00 -&gt; 2025-11-20T20:56:02+00:00" style="left:74.3902%; width:0.2527%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T21:02:04+00:00 -&gt; 2025-11-20T21:03:38+00:00" style="left:75.1569%; width:0.1335%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T21:14:47+00:00 -&gt; 2025-11-20T21:16:44+00:00" style="left:76.2402%; width:0.1661%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T21:18:39+00:00 -&gt; 2025-11-20T21:20:27+00:00" style="left:76.5696%; width:0.1533%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T21:24:36+00:00 -&gt; 2025-11-20T21:29:17+00:00" style="left:77.0764%; width:0.3990%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T21:40:28+00:00 -&gt; 2025-11-20T21:44:23+00:00" style="left:78.4280%; width:0.3336%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-20T21:47:36+00:00 -&gt; 2025-11-20T21:59:02+00:00" style="left:79.0357%; width:0.9740%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-21T00:39:34+00:00 -&gt; 2025-11-21T00:40:59+00:00" style="left:93.6849%; width:0.1207%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-21T00:50:31+00:00 -&gt; 2025-11-21T00:51:04+00:00" style="left:94.6177%; width:0.0469%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-21T01:02:30+00:00 -&gt; 2025-11-21T01:19:58+00:00" style="left:95.6385%; width:1.4879%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-21T01:33:05+00:00 -&gt; 2025-11-21T01:40:08+00:00" style="left:98.2437%; width:0.6006%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-21T01:42:14+00:00 -&gt; 2025-11-21T01:48:34+00:00" style="left:99.0232%; width:0.5395%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Dust Fan Motor | DRAWING_CURRENT | 2025-11-21T01:53:11+00:00 -&gt; 2025-11-21T01:53:42+00:00" style="left:99.9560%; width:0.0440%; background:hsl(65, 68%, 52%);"></div></div></div><div class="row"><div class="label">Left Cutter Motor</div><div class="track"><div class="cursor-line"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T06:20:00+00:00 -&gt; 2025-11-20T06:35:11+00:00" style="left:0.0170%; width:1.2934%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T06:37:34+00:00 -&gt; 2025-11-20T07:09:51+00:00" style="left:1.5135%; width:2.7501%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:12:28+00:00 -&gt; 2025-11-20T07:27:28+00:00" style="left:4.4865%; width:1.2778%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:30:15+00:00 -&gt; 2025-11-20T07:37:00+00:00" style="left:6.0014%; width:0.5750%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:40:32+00:00 -&gt; 2025-11-20T07:55:34+00:00" style="left:6.8774%; width:1.2806%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:57:35+00:00 -&gt; 2025-11-20T08:10:00+00:00" style="left:8.3298%; width:1.0577%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T09:31:33+00:00 -&gt; 2025-11-20T09:33:09+00:00" style="left:16.3344%; width:0.1363%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T09:36:05+00:00 -&gt; 2025-11-20T09:41:46+00:00" style="left:16.7206%; width:0.4841%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T09:43:19+00:00 -&gt; 2025-11-20T09:56:18+00:00" style="left:17.3368%; width:1.1060%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:08:16+00:00 -&gt; 2025-11-20T12:08:18+00:00" style="left:29.6845%; width:0.0028%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:10:19+00:00 -&gt; 2025-11-20T12:19:11+00:00" style="left:29.8592%; width:0.7553%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:22:02+00:00 -&gt; 2025-11-20T12:22:27+00:00" style="left:30.8573%; width:0.0355%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:24:04+00:00 -&gt; 2025-11-20T12:28:12+00:00" style="left:31.0305%; width:0.3521%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:31:31+00:00 -&gt; 2025-11-20T12:38:52+00:00" style="left:31.6651%; width:0.6261%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:56:14+00:00 -&gt; 2025-11-20T13:27:48+00:00" style="left:33.7706%; width:2.6890%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T13:29:32+00:00 -&gt; 2025-11-20T13:33:26+00:00" style="left:36.6073%; width:0.3322%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T13:36:47+00:00 -&gt; 2025-11-20T13:46:00+00:00" style="left:37.2249%; width:0.7851%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T14:00:57+00:00 -&gt; 2025-11-20T14:13:13+00:00" style="left:39.2836%; width:1.0449%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T14:16:37+00:00 -&gt; 2025-11-20T14:53:33+00:00" style="left:40.6182%; width:3.1462%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T15:01:19+00:00 -&gt; 2025-11-20T15:12:07+00:00" style="left:44.4260%; width:0.9200%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T15:15:48+00:00 -&gt; 2025-11-20T15:36:47+00:00" style="left:45.6598%; width:1.7875%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T15:38:41+00:00 -&gt; 2025-11-20T15:49:46+00:00" style="left:47.6091%; width:0.9441%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T20:31:22+00:00 -&gt; 2025-11-20T20:47:12+00:00" style="left:72.5417%; width:1.3488%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T20:48:52+00:00 -&gt; 2025-11-20T21:00:04+00:00" style="left:74.0324%; width:0.9541%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:02:16+00:00 -&gt; 2025-11-20T21:08:40+00:00" style="left:75.1739%; width:0.5452%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:15:02+00:00 -&gt; 2025-11-20T21:16:43+00:00" style="left:76.2615%; width:0.1434%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:18:53+00:00 -&gt; 2025-11-20T21:31:02+00:00" style="left:76.5894%; width:1.0350%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:40:43+00:00 -&gt; 2025-11-20T21:44:47+00:00" style="left:78.4493%; width:0.3464%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:47:48+00:00 -&gt; 2025-11-20T21:58:52+00:00" style="left:79.0527%; width:0.9427%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-21T00:39:46+00:00 -&gt; 2025-11-21T01:18:56+00:00" style="left:93.7019%; width:3.3365%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-21T01:33:18+00:00 -&gt; 2025-11-21T01:39:58+00:00" style="left:98.2622%; width:0.5679%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Left Cutter Motor | DRAWING_CURRENT | 2025-11-21T01:42:29+00:00 -&gt; 2025-11-21T01:48:24+00:00" style="left:99.0445%; width:0.5040%; background:hsl(65, 68%, 52%);"></div></div></div><div class="row"><div class="label">Right Cutter Motor</div><div class="track"><div class="cursor-line"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T06:20:02+00:00 -&gt; 2025-11-20T06:35:11+00:00" style="left:0.0199%; width:1.2906%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T06:37:36+00:00 -&gt; 2025-11-20T07:09:51+00:00" style="left:1.5163%; width:2.7473%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:12:30+00:00 -&gt; 2025-11-20T07:27:28+00:00" style="left:4.4893%; width:1.2750%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:30:13+00:00 -&gt; 2025-11-20T07:37:00+00:00" style="left:5.9985%; width:0.5778%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:40:34+00:00 -&gt; 2025-11-20T07:55:34+00:00" style="left:6.8802%; width:1.2778%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T07:57:33+00:00 -&gt; 2025-11-20T08:10:00+00:00" style="left:8.3269%; width:1.0606%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T09:31:33+00:00 -&gt; 2025-11-20T09:33:09+00:00" style="left:16.3344%; width:0.1363%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T09:36:03+00:00 -&gt; 2025-11-20T09:41:46+00:00" style="left:16.7178%; width:0.4870%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T09:43:21+00:00 -&gt; 2025-11-20T09:56:18+00:00" style="left:17.3396%; width:1.1032%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:10:17+00:00 -&gt; 2025-11-20T12:19:11+00:00" style="left:29.8563%; width:0.7582%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:22:00+00:00 -&gt; 2025-11-20T12:22:27+00:00" style="left:30.8544%; width:0.0383%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:24:06+00:00 -&gt; 2025-11-20T12:28:12+00:00" style="left:31.0333%; width:0.3493%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:31:29+00:00 -&gt; 2025-11-20T12:38:52+00:00" style="left:31.6623%; width:0.6290%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T12:56:16+00:00 -&gt; 2025-11-20T13:27:48+00:00" style="left:33.7735%; width:2.6862%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T13:29:34+00:00 -&gt; 2025-11-20T13:33:26+00:00" style="left:36.6102%; width:0.3294%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T13:36:49+00:00 -&gt; 2025-11-20T13:46:00+00:00" style="left:37.2278%; width:0.7823%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T14:00:57+00:00 -&gt; 2025-11-20T14:13:13+00:00" style="left:39.2836%; width:1.0449%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T14:16:35+00:00 -&gt; 2025-11-20T14:53:33+00:00" style="left:40.6153%; width:3.1490%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T15:01:17+00:00 -&gt; 2025-11-20T15:12:07+00:00" style="left:44.4231%; width:0.9228%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T15:15:46+00:00 -&gt; 2025-11-20T15:36:47+00:00" style="left:45.6569%; width:1.7903%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T15:38:43+00:00 -&gt; 2025-11-20T15:49:46+00:00" style="left:47.6119%; width:0.9413%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T20:31:24+00:00 -&gt; 2025-11-20T20:47:12+00:00" style="left:72.5445%; width:1.3459%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T20:48:54+00:00 -&gt; 2025-11-20T21:00:04+00:00" style="left:74.0353%; width:0.9512%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:02:18+00:00 -&gt; 2025-11-20T21:08:40+00:00" style="left:75.1768%; width:0.5424%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:14:59+00:00 -&gt; 2025-11-20T21:16:43+00:00" style="left:76.2572%; width:0.1477%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:18:51+00:00 -&gt; 2025-11-20T21:31:02+00:00" style="left:76.5866%; width:1.0379%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:40:41+00:00 -&gt; 2025-11-20T21:44:47+00:00" style="left:78.4465%; width:0.3493%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-20T21:47:50+00:00 -&gt; 2025-11-20T21:58:52+00:00" style="left:79.0556%; width:0.9399%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-21T00:39:48+00:00 -&gt; 2025-11-21T01:18:56+00:00" style="left:93.7047%; width:3.3336%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-21T01:33:20+00:00 -&gt; 2025-11-21T01:39:58+00:00" style="left:98.2650%; width:0.5651%; background:hsl(65, 68%, 52%);"></div><div class="bar" title="Right Cutter Motor | DRAWING_CURRENT | 2025-11-21T01:42:27+00:00 -&gt; 2025-11-21T01:48:24+00:00" style="left:99.0417%; width:0.5069%; background:hsl(65, 68%, 52%);"></div></div></div></div></div></div>
+        <script>
+            (() => {
+                const viewport = document.getElementById("timeline-viewport");
+                const canvas = document.getElementById("timeline-canvas");
+                const slider = document.getElementById("zoom-slider");
+                const readout = document.getElementById("zoom-readout");
+                const zoomIn = document.getElementById("zoom-in");
+                const zoomOut = document.getElementById("zoom-out");
+                const zoomReset = document.getElementById("zoom-reset");
+                const comparisonStats = document.getElementById("comparison-stats");
+                const comparisonMotorA = document.getElementById("compare-motor-a");
+                const comparisonMotorB = document.getElementById("compare-motor-b");
+                const tracks = Array.from(document.querySelectorAll(".track"));
+                const cursorLines = Array.from(document.querySelectorAll(".cursor-line"));
+                const tickLines = Array.from(document.querySelectorAll(".tick"));
+                const cursorLabel = document.getElementById("cursor-label");
+                const intervalData = {"Cutter Motors Under Load": [{"start": "2025-11-20T06:20:02+00:00", "end": "2025-11-20T06:35:08+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T06:37:36+00:00", "end": "2025-11-20T07:06:32+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T07:08:07+00:00", "end": "2025-11-20T07:09:47+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T07:12:30+00:00", "end": "2025-11-20T07:27:21+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T07:30:42+00:00", "end": "2025-11-20T07:36:40+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T07:41:03+00:00", "end": "2025-11-20T07:50:10+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T07:51:51+00:00", "end": "2025-11-20T07:54:47+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T07:57:35+00:00", "end": "2025-11-20T08:05:47+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T08:07:20+00:00", "end": "2025-11-20T08:10:00+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T09:31:34+00:00", "end": "2025-11-20T09:33:09+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T09:37:09+00:00", "end": "2025-11-20T09:38:40+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T09:43:21+00:00", "end": "2025-11-20T09:56:02+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T12:10:19+00:00", "end": "2025-11-20T12:19:10+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T12:24:16+00:00", "end": "2025-11-20T12:27:59+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T12:31:40+00:00", "end": "2025-11-20T12:38:43+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T12:56:52+00:00", "end": "2025-11-20T13:11:37+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T13:13:29+00:00", "end": "2025-11-20T13:26:57+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T13:29:34+00:00", "end": "2025-11-20T13:33:17+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T13:36:59+00:00", "end": "2025-11-20T13:46:00+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T14:00:57+00:00", "end": "2025-11-20T14:12:42+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T14:19:56+00:00", "end": "2025-11-20T14:53:19+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T15:01:19+00:00", "end": "2025-11-20T15:11:39+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T15:15:48+00:00", "end": "2025-11-20T15:22:17+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T15:25:40+00:00", "end": "2025-11-20T15:36:20+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T15:38:57+00:00", "end": "2025-11-20T15:44:38+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T15:46:37+00:00", "end": "2025-11-20T15:49:23+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T20:32:24+00:00", "end": "2025-11-20T20:34:36+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T20:37:09+00:00", "end": "2025-11-20T20:39:57+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T20:41:55+00:00", "end": "2025-11-20T20:45:12+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T20:48:54+00:00", "end": "2025-11-20T20:49:38+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T20:53:42+00:00", "end": "2025-11-20T20:56:23+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T20:58:00+00:00", "end": "2025-11-20T20:58:45+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:02:18+00:00", "end": "2025-11-20T21:03:28+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:05:04+00:00", "end": "2025-11-20T21:05:38+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:08:09+00:00", "end": "2025-11-20T21:08:28+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:15:07+00:00", "end": "2025-11-20T21:16:34+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:19:14+00:00", "end": "2025-11-20T21:19:32+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:21:17+00:00", "end": "2025-11-20T21:22:10+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:24:56+00:00", "end": "2025-11-20T21:29:02+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-20T21:47:50+00:00", "end": "2025-11-20T21:58:45+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T00:39:48+00:00", "end": "2025-11-21T00:42:41+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T00:47:57+00:00", "end": "2025-11-21T00:49:59+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T00:51:44+00:00", "end": "2025-11-21T00:52:04+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T00:55:04+00:00", "end": "2025-11-21T00:55:55+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T00:59:45+00:00", "end": "2025-11-21T01:00:38+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T01:03:37+00:00", "end": "2025-11-21T01:05:22+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T01:07:15+00:00", "end": "2025-11-21T01:11:34+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T01:13:30+00:00", "end": "2025-11-21T01:18:51+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T01:39:06+00:00", "end": "2025-11-21T01:39:55+00:00", "status": "UNDER_LOAD"}, {"start": "2025-11-21T01:43:05+00:00", "end": "2025-11-21T01:47:40+00:00", "status": "UNDER_LOAD"}], "Dust Fan Motor": [{"start": "2025-11-20T06:19:48+00:00", "end": "2025-11-20T06:35:11+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T06:37:22+00:00", "end": "2025-11-20T07:09:59+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:12:16+00:00", "end": "2025-11-20T07:27:27+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:29:58+00:00", "end": "2025-11-20T07:37:10+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:40:02+00:00", "end": "2025-11-20T07:55:34+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:57:21+00:00", "end": "2025-11-20T08:10:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:31:33+00:00", "end": "2025-11-20T09:33:10+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:35:51+00:00", "end": "2025-11-20T09:36:33+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:39:22+00:00", "end": "2025-11-20T09:39:57+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:42:46+00:00", "end": "2025-11-20T09:44:55+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:46:26+00:00", "end": "2025-11-20T09:56:28+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:07:41+00:00", "end": "2025-11-20T12:19:11+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:21:48+00:00", "end": "2025-11-20T12:28:13+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:31:09+00:00", "end": "2025-11-20T12:38:56+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:56:02+00:00", "end": "2025-11-20T13:27:48+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T13:29:20+00:00", "end": "2025-11-20T13:33:17+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T13:36:13+00:00", "end": "2025-11-20T13:46:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T14:00:57+00:00", "end": "2025-11-20T14:13:14+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T14:16:23+00:00", "end": "2025-11-20T14:53:34+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T15:00:59+00:00", "end": "2025-11-20T15:49:47+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:31:10+00:00", "end": "2025-11-20T20:33:31+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:36:41+00:00", "end": "2025-11-20T20:45:27+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:48:40+00:00", "end": "2025-11-20T20:50:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:53:04+00:00", "end": "2025-11-20T20:56:02+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:02:04+00:00", "end": "2025-11-20T21:03:38+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:14:47+00:00", "end": "2025-11-20T21:16:44+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:18:39+00:00", "end": "2025-11-20T21:20:27+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:24:36+00:00", "end": "2025-11-20T21:29:17+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:40:28+00:00", "end": "2025-11-20T21:44:23+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:47:36+00:00", "end": "2025-11-20T21:59:02+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T00:39:34+00:00", "end": "2025-11-21T00:40:59+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T00:50:31+00:00", "end": "2025-11-21T00:51:04+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:02:30+00:00", "end": "2025-11-21T01:19:58+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:33:05+00:00", "end": "2025-11-21T01:40:08+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:42:14+00:00", "end": "2025-11-21T01:48:34+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:53:11+00:00", "end": "2025-11-21T01:53:42+00:00", "status": "DRAWING_CURRENT"}], "Left Cutter Motor": [{"start": "2025-11-20T06:20:00+00:00", "end": "2025-11-20T06:35:11+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T06:37:34+00:00", "end": "2025-11-20T07:09:51+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:12:28+00:00", "end": "2025-11-20T07:27:28+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:30:15+00:00", "end": "2025-11-20T07:37:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:40:32+00:00", "end": "2025-11-20T07:55:34+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:57:35+00:00", "end": "2025-11-20T08:10:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:31:33+00:00", "end": "2025-11-20T09:33:09+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:36:05+00:00", "end": "2025-11-20T09:41:46+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:43:19+00:00", "end": "2025-11-20T09:56:18+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:08:16+00:00", "end": "2025-11-20T12:08:18+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:10:19+00:00", "end": "2025-11-20T12:19:11+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:22:02+00:00", "end": "2025-11-20T12:22:27+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:24:04+00:00", "end": "2025-11-20T12:28:12+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:31:31+00:00", "end": "2025-11-20T12:38:52+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:56:14+00:00", "end": "2025-11-20T13:27:48+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T13:29:32+00:00", "end": "2025-11-20T13:33:26+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T13:36:47+00:00", "end": "2025-11-20T13:46:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T14:00:57+00:00", "end": "2025-11-20T14:13:13+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T14:16:37+00:00", "end": "2025-11-20T14:53:33+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T15:01:19+00:00", "end": "2025-11-20T15:12:07+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T15:15:48+00:00", "end": "2025-11-20T15:36:47+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T15:38:41+00:00", "end": "2025-11-20T15:49:46+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:31:22+00:00", "end": "2025-11-20T20:47:12+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:48:52+00:00", "end": "2025-11-20T21:00:04+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:02:16+00:00", "end": "2025-11-20T21:08:40+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:15:02+00:00", "end": "2025-11-20T21:16:43+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:18:53+00:00", "end": "2025-11-20T21:31:02+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:40:43+00:00", "end": "2025-11-20T21:44:47+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:47:48+00:00", "end": "2025-11-20T21:58:52+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T00:39:46+00:00", "end": "2025-11-21T01:18:56+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:33:18+00:00", "end": "2025-11-21T01:39:58+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:42:29+00:00", "end": "2025-11-21T01:48:24+00:00", "status": "DRAWING_CURRENT"}], "Right Cutter Motor": [{"start": "2025-11-20T06:20:02+00:00", "end": "2025-11-20T06:35:11+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T06:37:36+00:00", "end": "2025-11-20T07:09:51+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:12:30+00:00", "end": "2025-11-20T07:27:28+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:30:13+00:00", "end": "2025-11-20T07:37:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:40:34+00:00", "end": "2025-11-20T07:55:34+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T07:57:33+00:00", "end": "2025-11-20T08:10:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:31:33+00:00", "end": "2025-11-20T09:33:09+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:36:03+00:00", "end": "2025-11-20T09:41:46+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T09:43:21+00:00", "end": "2025-11-20T09:56:18+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:10:17+00:00", "end": "2025-11-20T12:19:11+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:22:00+00:00", "end": "2025-11-20T12:22:27+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:24:06+00:00", "end": "2025-11-20T12:28:12+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:31:29+00:00", "end": "2025-11-20T12:38:52+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T12:56:16+00:00", "end": "2025-11-20T13:27:48+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T13:29:34+00:00", "end": "2025-11-20T13:33:26+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T13:36:49+00:00", "end": "2025-11-20T13:46:00+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T14:00:57+00:00", "end": "2025-11-20T14:13:13+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T14:16:35+00:00", "end": "2025-11-20T14:53:33+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T15:01:17+00:00", "end": "2025-11-20T15:12:07+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T15:15:46+00:00", "end": "2025-11-20T15:36:47+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T15:38:43+00:00", "end": "2025-11-20T15:49:46+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:31:24+00:00", "end": "2025-11-20T20:47:12+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T20:48:54+00:00", "end": "2025-11-20T21:00:04+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:02:18+00:00", "end": "2025-11-20T21:08:40+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:14:59+00:00", "end": "2025-11-20T21:16:43+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:18:51+00:00", "end": "2025-11-20T21:31:02+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:40:41+00:00", "end": "2025-11-20T21:44:47+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-20T21:47:50+00:00", "end": "2025-11-20T21:58:52+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T00:39:48+00:00", "end": "2025-11-21T01:18:56+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:33:20+00:00", "end": "2025-11-21T01:39:58+00:00", "status": "DRAWING_CURRENT"}, {"start": "2025-11-21T01:42:27+00:00", "end": "2025-11-21T01:48:24+00:00", "status": "DRAWING_CURRENT"}]};
+                const timelineMeta = {"windowStartMs": 1763619588000, "windowEndMs": 1763690022000};
+                const motorNames = Object.keys(intervalData);
+
+                if (!viewport || !canvas || !slider || !readout) {
+                    return;
+                }
+
+                const BASE_MIN_WIDTH = 960;
+
+                function currentTicksLeft() {
+                    const raw = getComputedStyle(document.documentElement)
+                        .getPropertyValue("--ticks-left")
+                        .trim()
+                        .replace("px", "");
+                    return Number.parseFloat(raw) || 180;
+                }
+
+                function setZoom(nextZoom) {
+                    const zoom = Math.min(12, Math.max(1, nextZoom));
+                    const priorScrollable = Math.max(1, canvas.scrollWidth - viewport.clientWidth);
+                    const priorRatio = priorScrollable > 0 ? viewport.scrollLeft / priorScrollable : 0;
+                    const ticksLeft = currentTicksLeft();
+                    const baseWidth = Math.max(viewport.clientWidth, BASE_MIN_WIDTH);
+                    const trackBaseWidth = Math.max(240, baseWidth - ticksLeft);
+                    canvas.style.width = `${ticksLeft + trackBaseWidth * zoom}px`;
+                    slider.value = String(zoom);
+                    readout.textContent = `${Math.round(zoom * 100)}%`;
+
+                    requestAnimationFrame(() => {
+                        const nextScrollable = Math.max(0, canvas.scrollWidth - viewport.clientWidth);
+                        viewport.scrollLeft = nextScrollable * priorRatio;
+                    });
+                }
+
+                slider.addEventListener("input", () => setZoom(Number.parseFloat(slider.value)));
+                zoomIn.addEventListener("click", () => setZoom(Number.parseFloat(slider.value) + 0.5));
+                zoomOut.addEventListener("click", () => setZoom(Number.parseFloat(slider.value) - 0.5));
+                zoomReset.addEventListener("click", () => setZoom(1));
+                viewport.addEventListener(
+                    "wheel",
+                    (event) => {
+                        if (!event.ctrlKey) {
+                            return;
+                        }
+                        event.preventDefault();
+                        const delta = event.deltaY < 0 ? 0.5 : -0.5;
+                        setZoom(Number.parseFloat(slider.value) + delta);
+                    },
+                    { passive: false },
+                );
+                window.addEventListener("resize", () => setZoom(Number.parseFloat(slider.value)));
+
+                function parseIntervals(motorName) {
+                    return (intervalData[motorName] || []).map((item) => ({
+                        start: new Date(item.start).getTime(),
+                        end: new Date(item.end).getTime(),
+                    }));
+                }
+
+                function mergeIntervals(items) {
+                    if (items.length === 0) {
+                        return [];
+                    }
+
+                    const sorted = [...items].sort((a, b) => a.start - b.start);
+                    const merged = [sorted[0]];
+
+                    for (let i = 1; i < sorted.length; i += 1) {
+                        const current = sorted[i];
+                        const last = merged[merged.length - 1];
+
+                        if (current.start <= last.end) {
+                            last.end = Math.max(last.end, current.end);
+                        } else {
+                            merged.push({ ...current });
+                        }
+                    }
+
+                    return merged;
+                }
+
+                function sumDuration(items) {
+                    return items.reduce((total, item) => total + Math.max(0, item.end - item.start), 0);
+                }
+
+                function overlappingIntervalDuration(reference, candidate) {
+                    const normalizedReference = mergeIntervals(reference);
+                    const normalizedCandidate = mergeIntervals(candidate);
+                    let total = 0;
+                    let referenceIndex = 0;
+                    let candidateIndex = 0;
+
+                    while (referenceIndex < normalizedReference.length && candidateIndex < normalizedCandidate.length) {
+                        const referenceInterval = normalizedReference[referenceIndex];
+                        const candidateInterval = normalizedCandidate[candidateIndex];
+
+                        if (candidateInterval.end <= referenceInterval.start) {
+                            candidateIndex += 1;
+                            continue;
+                        }
+                        if (referenceInterval.end <= candidateInterval.start) {
+                            referenceIndex += 1;
+                            continue;
+                        }
+
+                        const overlapStart = Math.max(referenceInterval.start, candidateInterval.start);
+                        const overlapEnd = Math.min(referenceInterval.end, candidateInterval.end);
+                        total += Math.max(0, overlapEnd - overlapStart);
+
+                        if (referenceInterval.end <= candidateInterval.end) {
+                            referenceIndex += 1;
+                        } else {
+                            candidateIndex += 1;
+                        }
+                    }
+
+                    return total;
+                }
+
+                function formatDuration(milliseconds) {
+                    const totalSeconds = Math.round(milliseconds / 1000);
+                    const hours = Math.floor(totalSeconds / 3600);
+                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                    const seconds = totalSeconds % 60;
+                    if (hours > 0) {
+                        return `${hours}h ${minutes}m ${seconds}s`;
+                    }
+                    if (minutes > 0) {
+                        return `${minutes}m ${seconds}s`;
+                    }
+                    return `${seconds}s`;
+                }
+
+                function formatPercent(numerator, denominator) {
+                    if (!denominator) {
+                        return "0.0%";
+                    }
+                    return `${((numerator / denominator) * 100).toFixed(1)}%`;
+                }
+
+                function renderComparison() {
+                    if (!comparisonStats || !comparisonMotorA || !comparisonMotorB || motorNames.length === 0) {
+                        return;
+                    }
+                    const motorA = comparisonMotorA.value;
+                    const motorB = comparisonMotorB.value;
+                    const intervalsA = parseIntervals(motorA);
+                    const intervalsB = parseIntervals(motorB);
+                    const durationA = sumDuration(intervalsA);
+                    const durationB = sumDuration(intervalsB);
+                    const comparedRuntime = overlappingIntervalDuration(intervalsA, intervalsB);
+
+                    comparisonStats.innerHTML = `
+                        <div class="comparison-pill"><span>${motorA} runtime</span><strong>${formatDuration(durationA)}</strong></div>
+                        <div class="comparison-pill"><span>${motorB} runtime</span><strong>${formatDuration(durationB)}</strong></div>
+                        <div class="comparison-pill"><span>${motorB} runtime while ${motorA} is running</span><strong>${formatDuration(comparedRuntime)}</strong></div>
+                        <div class="comparison-pill"><span>${motorB} running within ${motorA} runtime window</span><strong>${formatPercent(comparedRuntime, durationA)}</strong></div>
+                        <div class="comparison-pill"><span>${motorB} total runtime compared to ${motorA}</span><strong>${formatPercent(durationB, durationA)}</strong></div>
+                    `;
+                }
+
+                function showCursor(positionPercent) {
+                    cursorLines.forEach((line) => {
+                        line.style.left = `${positionPercent}%`;
+                        line.style.opacity = "1";
+                    });
+                    if (cursorLabel) {
+                        const span = timelineMeta.windowEndMs - timelineMeta.windowStartMs;
+                        const timestamp = timelineMeta.windowStartMs + (span * positionPercent) / 100;
+                        cursorLabel.textContent = new Date(timestamp).toLocaleString();
+                        cursorLabel.style.left = `${positionPercent}%`;
+                        cursorLabel.style.opacity = "1";
+                    }
+                    tickLines.forEach((line) => {
+                        line.classList.add("cursor-active");
+                    });
+                }
+
+                function hideCursor() {
+                    cursorLines.forEach((line) => {
+                        line.style.opacity = "0";
+                    });
+                    if (cursorLabel) {
+                        cursorLabel.style.opacity = "0";
+                    }
+                    tickLines.forEach((line) => {
+                        line.classList.remove("cursor-active");
+                    });
+                }
+
+                tracks.forEach((track) => {
+                    track.addEventListener("mousemove", (event) => {
+                        const rect = track.getBoundingClientRect();
+                        if (rect.width <= 0) {
+                            return;
+                        }
+                        const clamped = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+                        const positionPercent = (clamped / rect.width) * 100;
+                        showCursor(positionPercent);
+                    });
+                    track.addEventListener("mouseenter", (event) => {
+                        const rect = track.getBoundingClientRect();
+                        if (rect.width <= 0) {
+                            return;
+                        }
+                        const clamped = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+                        const positionPercent = (clamped / rect.width) * 100;
+                        showCursor(positionPercent);
+                    });
+                    track.addEventListener("mouseleave", hideCursor);
+                });
+
+                viewport.addEventListener("mouseleave", hideCursor);
+
+                if (comparisonMotorA && comparisonMotorB && motorNames.length > 0) {
+                    comparisonMotorA.value = motorNames[0];
+                    comparisonMotorB.value = motorNames[Math.min(1, motorNames.length - 1)];
+                    comparisonMotorA.addEventListener("change", renderComparison);
+                    comparisonMotorB.addEventListener("change", renderComparison);
+                    renderComparison();
+                }
+
+                setZoom(1);
+            })();
+        </script>
+        
+    </div>
+</body>
+</html>

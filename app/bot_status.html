@@ -1,0 +1,2422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trading + Crypto Compounding Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f141a;
+            --surface: #171f28;
+            --surface-2: #202a36;
+            --border: #2d3947;
+            --text: #d7e0ea;
+            --muted: #93a4b7;
+            --ok: #3ecf8e;
+            --bad: #ff7b72;
+            --accent: #49a5ff;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 16px;
+            background: radial-gradient(circle at top right, #1d2630 0%, var(--bg) 42%);
+            color: var(--text);
+            font-family: "Segoe UI", system-ui, sans-serif;
+        }
+
+        h1 { margin: 0 0 8px; font-size: 1.6rem; }
+        .sub { color: var(--muted); margin-bottom: 14px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .card {
+            background: linear-gradient(180deg, var(--surface), var(--surface-2));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .full { grid-column: span 12; }
+        .half { grid-column: span 6; }
+        .third { grid-column: span 4; }
+
+        .kpi-title { color: var(--muted); font-size: 0.82rem; margin-bottom: 6px; }
+        .kpi-value { font-size: 1.3rem; font-weight: 700; }
+
+        .status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+        .research-pill {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+        }
+        .ok { background: rgba(62,207,142,.15); color: var(--ok); border: 1px solid rgba(62,207,142,.35); }
+        .bad { background: rgba(255,123,114,.15); color: var(--bad); border: 1px solid rgba(255,123,114,.35); }
+
+        .tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+        .tab {
+            border: 1px solid var(--border);
+            background: #111923;
+            color: var(--muted);
+            border-radius: 999px;
+            padding: 6px 11px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .tab.active {
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px rgba(73,165,255,.35) inset;
+        }
+
+        .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+        .small { color: var(--muted); font-size: 0.84rem; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        th, td { padding: 7px 6px; border-bottom: 1px solid #2a3440; text-align: left; }
+        th { color: var(--muted); font-weight: 600; }
+
+        .mode-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            background: rgba(73,165,255,.14);
+            border: 1px solid rgba(73,165,255,.38);
+            color: #b9dcff;
+        }
+
+        #chatLog {
+            min-height: 160px;
+            max-height: 290px;
+            overflow-y: auto;
+            border: 1px solid #2a3440;
+            border-radius: 8px;
+            background: #121a24;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        .msg {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+            line-height: 1.42;
+        }
+        .msg.user { background: rgba(73,165,255,.14); border-color: rgba(73,165,255,.38); }
+        .msg.bot  { background: #1a2531; }
+
+        .chat-row { display: flex; gap: 8px; }
+        .chat-row textarea {
+            flex: 1;
+            min-height: 62px;
+            resize: vertical;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #0f1620;
+            color: var(--text);
+            padding: 9px;
+            font-family: inherit;
+        }
+        .chat-row button {
+            min-width: 100px;
+            border: 1px solid var(--accent);
+            color: #fff;
+            background: #1d4d74;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .chart-wrap {
+            width: 100%;
+            height: 220px;
+            background: #121a24;
+            border: 1px solid #2a3440;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 14px;
+            margin-top: 8px;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        .chart-tooltip {
+            position: absolute;
+            display: none;
+            z-index: 5;
+            pointer-events: none;
+            min-width: 210px;
+            max-width: 280px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #2d3947;
+            background: rgba(12, 18, 25, 0.95);
+            color: #d7e0ea;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+            font-size: 0.8rem;
+            line-height: 1.35;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .ctl-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .ctl-btn {
+            border: 1px solid #2d3947;
+            background: #0f1620;
+            color: #d7e0ea;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.76rem;
+            cursor: pointer;
+        }
+
+        .ctl-btn:hover {
+            border-color: #49a5ff;
+            color: #ffffff;
+        }
+
+        .ctl-status {
+            margin-top: 8px;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .health-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin: 4px 0;
+        }
+
+        .health-label {
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .health-state {
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .health-state.healthy {
+            background: rgba(62,207,142,.15);
+            color: var(--ok);
+            border-color: rgba(62,207,142,.35);
+        }
+
+        .health-state.warn {
+            background: rgba(242, 201, 76, 0.15);
+            color: #f2c94c;
+            border-color: rgba(242, 201, 76, 0.35);
+        }
+
+        .health-state.critical {
+            background: rgba(255,123,114,.15);
+            color: var(--bad);
+            border-color: rgba(255,123,114,.35);
+        }
+
+        @media (max-width: 1000px) {
+            .half, .third { grid-column: span 12; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Trading + Crypto Compounding Dashboard</h1>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div class="sub" id="lastUpdated" style="margin-bottom:14px;">Loading bot dashboard...</div>
+        <a href="/dashboard_logout" class="small" style="margin-bottom:14px;color:#9ed0ff;text-decoration:none;">Log out</a>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" id="tab-trading" onclick="setTab('trading_bot')">Trading Bot</button>
+        <button class="tab" id="tab-crypto" onclick="setTab('crypto_bot')">Crypto Bot</button>
+        <button class="tab" id="tab-asx" onclick="setTab('asx_bot')" style="display:none;">ASX Bot</button>
+        <button class="tab" id="tab-forex" onclick="setTab('forex_bot')" style="display:none;">Forex Bot</button>
+        <button class="tab" id="tab-tech" onclick="setTab('tech_research_bot')" style="display:none;">Research Bot</button>
+        <button class="tab" id="tab-both" onclick="setTab('both')">Combined</button>
+    </div>
+
+    <div class="grid">
+        <!-- ===== Bot Health Alerts ===== -->
+        <div class="card full" id="panel-health-alerts">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div class="kpi-title" style="margin:0;">Bot Health Alerts</div>
+                <span id="healthAlertsBadge" style="display:none;background:rgba(255,123,114,.18);color:#ff7b72;border:1px solid rgba(255,123,114,.45);border-radius:999px;padding:2px 10px;font-size:0.78rem;font-weight:700;"></span>
+            </div>
+            <table id="healthAlertsTable">
+                <thead>
+                    <tr>
+                        <th>Bot</th>
+                        <th>Process</th>
+                        <th>Log Errors</th>
+                        <th>Kill-Switch</th>
+                        <th>Log Silent</th>
+                        <th>Source Degraded</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="healthAlertsRows"></tbody>
+            </table>
+            <div class="small" style="margin-top:8px;color:#5a7a99;">Refreshes every 30 s. "Log Silent" = no log writes in >90 min (orange) or >3 h (red).</div>
+        </div>
+
+        <div class="card full" id="panel-system-health">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div>
+                    <div class="kpi-title" style="margin:0;">System Health Check</div>
+                    <div class="small">Aggregates guardrails, drift, execution quality, promotion stage, and capital pacing.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <span id="systemHealthSummary" class="health-state warn">CHECKING...</span>
+                    <button class="ctl-btn" onclick="runSystemHealthCheck(true)">Run Health Check</button>
+                </div>
+            </div>
+            <div class="small" id="systemHealthTimestamp" style="margin-top:8px;">Last check: -</div>
+
+            <div class="health-grid">
+                <div class="card" style="padding:10px;">
+                    <div class="kpi-title" style="margin-bottom:6px;">Trading Bot</div>
+                    <div class="health-row"><span class="health-label">Kill Switch</span><span id="healthTradingGuardrail" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Drift</span><span id="healthTradingDrift" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Execution Quality</span><span id="healthTradingExec" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Promotion Stage</span><span id="healthTradingPromotion" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Capital Pacing</span><span id="healthTradingPacing" class="health-state warn">-</span></div>
+                </div>
+
+                <div class="card" style="padding:10px;">
+                    <div class="kpi-title" style="margin-bottom:6px;">Crypto Bot</div>
+                    <div class="health-row"><span class="health-label">Kill Switch</span><span id="healthCryptoGuardrail" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Drift</span><span id="healthCryptoDrift" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Execution Quality</span><span id="healthCryptoExec" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Promotion Stage</span><span id="healthCryptoPromotion" class="health-state warn">-</span></div>
+                    <div class="health-row"><span class="health-label">Capital Pacing</span><span id="healthCryptoPacing" class="health-state warn">-</span></div>
+                </div>
+
+                <div class="card" style="padding:10px;">
+                    <div class="kpi-title" style="margin-bottom:6px;">Quick Actions</div>
+                    <div class="small" style="margin-bottom:8px;">Use these checks to confirm reliability controls are live.</div>
+                    <div class="ctl-actions">
+                        <button class="ctl-btn" onclick="openApiPath('/portfolio_guardrails')">Guardrails JSON</button>
+                        <button class="ctl-btn" onclick="openApiPath('/execution_quality')">Execution JSON</button>
+                        <button class="ctl-btn" onclick="openApiPath('/promotion_status')">Promotion JSON</button>
+                        <button class="ctl-btn" onclick="openApiPath('/capital_pacing')">Pacing JSON</button>
+                    </div>
+                    <div class="small" style="margin-top:8px;" id="systemHealthNotes">Notes: -</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card third">
+            <div class="kpi-title">Trading Bot</div>
+            <div id="tradingStatus" class="status-pill">Checking...</div>
+            <div id="tradingResearchStatus" class="research-pill bad">Research: Checking...</div>
+            <div class="small" style="margin-top:8px;">Heartbeat: <span id="tradingTopHeartbeat">-</span></div>
+        </div>
+
+        <div class="card third">
+            <div class="kpi-title">Crypto Bot</div>
+            <div id="cryptoStatus" class="status-pill">Checking...</div>
+            <div id="cryptoResearchStatus" class="research-pill bad">Research: Checking...</div>
+            <div class="small" style="margin-top:8px;">Heartbeat: <span id="cryptoTopHeartbeat">-</span></div>
+        </div>
+
+        <div class="card third">
+            <div class="kpi-title">Combined (3 Bots)</div>
+            <div id="allStatus" class="status-pill">Checking...</div>
+            <div id="allResearchStatus" class="research-pill bad">Research: Checking...</div>
+            <div class="small" style="margin-top:8px;">Heartbeat: <span id="allTopHeartbeat">-</span></div>
+        </div>
+
+        <div class="card third" style="display:none;">
+            <div class="kpi-title">ASX Bot</div>
+            <div id="asxStatus" class="status-pill">Checking...</div>
+            <div id="asxResearchStatus" class="research-pill bad">Research: Checking...</div>
+            <div class="small" style="margin-top:8px;">Heartbeat: <span id="asxTopHeartbeat">-</span></div>
+        </div>
+
+        <div class="card third" style="display:none;">
+            <div class="kpi-title">Forex Bot</div>
+            <div id="forexStatus" class="status-pill">Checking...</div>
+            <div id="forexResearchStatus" class="research-pill bad">Research: Checking...</div>
+            <div class="small" style="margin-top:8px;">Heartbeat: <span id="forexTopHeartbeat">-</span></div>
+        </div>
+
+        <div class="card third">
+            <div class="kpi-title">Research Bot</div>
+            <div id="techStatus" class="status-pill">Checking...</div>
+            <div id="techResearchStatus" class="research-pill bad">Research: Checking...</div>
+            <div class="small" style="margin-top:8px;">Heartbeat: <span id="techTopHeartbeat">-</span></div>
+        </div>
+
+        <div class="card full" id="panel-autonomy">
+            <div class="kpi-title">Autonomy Control Panel (All Bots)</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bot</th>
+                        <th>Mode</th>
+                        <th>Regime</th>
+                        <th>Score</th>
+                        <th>Allow Entries</th>
+                        <th>Checks Passed</th>
+                        <th>Win / PF / DD</th>
+                        <th>Blocked Symbols</th>
+                        <th>Top Allocations</th>
+                        <th>Auto-Improvement</th>
+                        <th>Research Trigger</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="autonomyRows"></tbody>
+            </table>
+            <div class="small" style="margin-top:8px;">
+                Check policy: closed trades >= 8, win rate >= 52%, profit factor >= 1.10, realized pnl >= 0, drawdown within cap.
+            </div>
+            <div id="controlStatus" class="ctl-status">Use Start, Stop, Restart, or Reset Faults per bot.</div>
+        </div>
+
+        <div class="card full" id="panel-autonomy-learning">
+            <div class="kpi-title">Autonomy Learning Memory (All Bots)</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bot</th>
+                        <th>Last Mode</th>
+                        <th>Aggressive W/L</th>
+                        <th>Aggressive Success</th>
+                        <th>Aggressive PnL Sum</th>
+                        <th>Cooldown Until</th>
+                    </tr>
+                </thead>
+                <tbody id="autonomyLearningRows"></tbody>
+            </table>
+        </div>
+
+        <div class="card full" id="panel-return-scorecard">
+            <div class="kpi-title">Target Return Probability Scorecard</div>
+            <div class="small" style="margin-bottom:8px;">
+                Target: <span id="scorecardTarget">20%</span> | Generated: <span id="scorecardGenerated">-</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bot</th>
+                        <th>Closed Trades (7d)</th>
+                        <th>Win Rate (7d)</th>
+                        <th>Profit Factor (7d)</th>
+                        <th>Estimated Return (7d)</th>
+                        <th>Data Quality</th>
+                        <th>Probability Hit Target</th>
+                    </tr>
+                </thead>
+                <tbody id="scorecardRows"></tbody>
+            </table>
+        </div>
+
+        <div class="card full" id="panel-research">
+            <div class="kpi-title">Search Research Activity (All Bots)</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bot</th>
+                        <th>Provider / Engine</th>
+                        <th>Research Enabled</th>
+                        <th>API Key</th>
+                        <th>Research Hits</th>
+                        <th>Non-Zero EXT</th>
+                        <th>Last Seen</th>
+                        <th>Latest Research Line</th>
+                    </tr>
+                </thead>
+                <tbody id="researchRows"></tbody>
+            </table>
+        </div>
+
+        <div class="card full" id="panel-research-log">
+            <div class="kpi-title" id="researchLogTitle">Recent Research Log</div>
+            <div id="researchLog" class="mono" style="white-space:pre-wrap;font-size:0.84rem;line-height:1.42;max-height:240px;overflow-y:auto;background:#121a24;border:1px solid #2a3440;border-radius:8px;padding:10px;"></div>
+        </div>
+
+        <div class="card full" id="panel-investment">
+            <div class="kpi-title">Investment Performance (Trading + Crypto)</div>
+            <div class="chart-wrap">
+                <svg id="investmentSvg" class="chart-svg" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-label="Investment performance chart"></svg>
+                <div id="investmentTooltip" class="chart-tooltip"></div>
+            </div>
+            <div class="chart-legend">
+                <span><span class="legend-dot" style="background:#3ecf8e;"></span>Sell-All Value</span>
+                <span><span class="legend-dot" style="background:#49a5ff;"></span>Cash</span>
+                <span><span class="legend-dot" style="background:#d29922;"></span>Buying Power</span>
+            </div>
+            <div class="small" style="margin-top:8px;" id="investmentMeta">Loading investment history...</div>
+        </div>
+
+        <div class="card full" id="panel-investment-summary">
+            <div class="kpi-title">Investment Summary</div>
+            <div class="grid" style="gap:8px;grid-template-columns:repeat(3,minmax(0,1fr));">
+                <div>
+                    <div class="small">Invested Capital</div>
+                    <div class="kpi-value" id="investedCapital">-</div>
+                </div>
+                <div>
+                    <div class="small">Estimated Unrealized PnL</div>
+                    <div class="kpi-value" id="unrealizedPnl">-</div>
+                </div>
+                <div>
+                    <div class="small">Estimated Trading Realized PnL</div>
+                    <div class="kpi-value" id="tradingRealizedPnl">-</div>
+                </div>
+                <div>
+                    <div class="small">Net Liquidation Value</div>
+                    <div class="kpi-value" id="netLiquidationValue">-</div>
+                </div>
+                <div>
+                    <div class="small">Estimated Net PnL if Liquidated</div>
+                    <div class="kpi-value" id="netLiquidatedPnl">-</div>
+                </div>
+                <div>
+                    <div class="small">Combined Realized PnL</div>
+                    <div class="kpi-value" id="combinedRealizedPnl">-</div>
+                </div>
+            </div>
+            <div class="small" style="margin-top:8px;" id="investmentSummaryNote">Trading unrealized estimates are derived from trade-log cost basis and latest equity snapshot.</div>
+        </div>
+
+        <div class="card full" id="panel-projection">
+            <div class="kpi-title">Projected Returns (Current Setup)</div>
+            <div class="chart-wrap">
+                <svg id="projectionSvg" class="chart-svg" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-label="Projected returns chart"></svg>
+                <div id="projectionTooltip" class="chart-tooltip"></div>
+            </div>
+            <div class="small" style="margin-top:8px;" id="projectionMeta">Loading projection...</div>
+        </div>
+
+        <div class="card full" id="panel-compounding">
+            <div class="kpi-title">20-Year Compounding Projection — $1,000/month from $0</div>
+            <div class="chart-wrap" style="height:280px;">
+                <svg id="compoundingSvg" class="chart-svg" viewBox="0 0 1000 280" preserveAspectRatio="none" aria-label="20-year compounding projection"></svg>
+                <div id="compoundingTooltip" class="chart-tooltip"></div>
+            </div>
+            <div class="chart-legend" style="margin-top:10px;">
+                <span><span class="legend-dot" style="background:#93a4b7;"></span>8% — Index (passive)</span>
+                <span><span class="legend-dot" style="background:#49a5ff;"></span>12% — Conservative</span>
+                <span><span class="legend-dot" style="background:#f59f00;"></span>15% — Moderate</span>
+                <span><span class="legend-dot" style="background:#3ecf8e;"></span>20% — Bot Target</span>
+                <span id="observedBotLegend" style="display:none;"><span class="legend-dot" style="background:#ff7b72;"></span>Observed Bot Rate</span>
+            </div>
+            <div class="small" style="margin-top:8px;" id="compoundingMeta">$240,000 total invested over 20 years at $1,000/month from $0. Hover to see year-by-year values.</div>
+        </div>
+
+        <div class="card half" id="panel-trading-metrics">
+            <div class="kpi-title">Trading Metrics</div>
+            <div class="grid" style="gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));">
+                <div>
+                    <div class="small">Latest Equity</div>
+                    <div class="kpi-value" id="tradingEquity">-</div>
+                </div>
+                <div>
+                    <div class="small">Open Positions</div>
+                    <div class="kpi-value" id="tradingOpen">-</div>
+                </div>
+                <div>
+                    <div class="small">Trade Rows</div>
+                    <div class="kpi-value" id="tradingRows">-</div>
+                </div>
+                <div>
+                    <div class="small">Buy / Sell</div>
+                    <div class="kpi-value" id="tradingBuySell">-</div>
+                </div>
+            </div>
+            <div class="small" style="margin-top:8px;">Top Symbols: <span id="tradingTopSymbols">-</span></div>
+            <div class="small" style="margin-top:6px;">Heartbeat: <span id="tradingHeartbeat">-</span></div>
+        </div>
+
+        <div class="card half" id="panel-crypto-metrics">
+            <div class="kpi-title">Crypto Metrics</div>
+            <div class="grid" style="gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));">
+                <div>
+                    <div class="small">BUY Mentions</div>
+                    <div class="kpi-value" id="cryptoBuy">-</div>
+                </div>
+                <div>
+                    <div class="small">SELL Mentions</div>
+                    <div class="kpi-value" id="cryptoSell">-</div>
+                </div>
+                <div>
+                    <div class="small">HOLD Mentions</div>
+                    <div class="kpi-value" id="cryptoHold">-</div>
+                </div>
+                <div>
+                    <div class="small">Errors Detected</div>
+                    <div class="kpi-value" id="cryptoError">-</div>
+                </div>
+                <div>
+                    <div class="small">Research Score</div>
+                    <div class="kpi-value" id="cryptoResearchScore">-</div>
+                </div>
+                <div>
+                    <div class="small">Research Headlines</div>
+                    <div class="kpi-value" id="cryptoResearchHeadlines">-</div>
+                </div>
+            </div>
+            <div class="small" style="margin-top:8px;">Pair Mentions: <span id="cryptoPairs">-</span></div>
+            <div class="small" style="margin-top:6px;">Dominant Topics: <span id="cryptoResearchTopics">-</span></div>
+            <div class="small" style="margin-top:6px;">Strategy Notes: <span id="cryptoResearchNotes">-</span></div>
+            <div class="small" style="margin-top:6px;">Heartbeat: <span id="cryptoHeartbeat">-</span></div>
+        </div>
+
+        <div class="card full" id="panel-trades">
+            <div class="kpi-title">Recent Trading Bot Trades</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>Symbol</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                        <th>Predicted %</th>
+                        <th>Signals</th>
+                    </tr>
+                </thead>
+                <tbody id="tradesRows"></tbody>
+            </table>
+        </div>
+
+        <!-- ── OBSERVABILITY CARDS ─────────────────────────────────── -->
+        <div class="card half" id="panel-live-trades">
+            <div class="kpi-title">What the Bot Traded Today</div>
+            <div id="liveTrades" style="font-size:0.88rem;line-height:1.7;">
+                <span style="color:#5a7a99;">Loading…</span>
+            </div>
+            <div class="small" style="margin-top:8px;color:#5a7a99;" id="liveTradesTs"></div>
+        </div>
+
+        <div class="card half" id="panel-open-positions">
+            <div class="kpi-title">What the Bot Currently Holds</div>
+            <div id="openPositions" style="font-size:0.88rem;line-height:1.7;">
+                <span style="color:#5a7a99;">Loading…</span>
+            </div>
+            <div class="small" style="margin-top:8px;color:#5a7a99;" id="openPositionsTs"></div>
+        </div>
+
+        <div class="card full" id="panel-last-signals">
+            <div class="kpi-title">How Each Stock Was Evaluated This Cycle</div>
+            <div class="small" style="margin-bottom:10px;color:#5a7a99;">Shows what the bot decided for each symbol and <em>why</em>. Updated every cycle.</div>
+            <div id="lastSignals" style="font-size:0.88rem;line-height:1.7;">
+                <span style="color:#5a7a99;">Loading…</span>
+            </div>
+            <div class="small" style="margin-top:8px;color:#5a7a99;" id="lastSignalsTs"></div>
+        </div>
+
+        <div class="card half" id="panel-data-health">
+            <div class="kpi-title">Data Freshness</div>
+            <div id="dataHealth" style="font-size:0.88rem;line-height:1.9;">
+                <span style="color:#5a7a99;">Loading…</span>
+            </div>
+            <div class="small" style="margin-top:8px;color:#5a7a99;" id="dataHealthTs"></div>
+        </div>
+
+        <div class="card half" id="panel-bot-heartbeat">
+            <div class="kpi-title">Bot Activity Status</div>
+            <div id="botHeartbeat" style="font-size:0.88rem;line-height:1.9;">
+                <span style="color:#5a7a99;">Loading…</span>
+            </div>
+            <div class="small" style="margin-top:8px;color:#5a7a99;" id="botHeartbeatTs"></div>
+        </div>
+        <!-- ── END OBSERVABILITY CARDS ─────────────────────────────── -->
+
+        <div class="card full" id="panel-logs" style="display:none;">
+            <div class="kpi-title">Recent Crypto Bot Log</div>
+            <div id="cryptoLog" class="mono" style="white-space:pre-wrap;font-size:0.84rem;line-height:1.42;max-height:280px;overflow-y:auto;background:#121a24;border:1px solid #2a3440;border-radius:8px;padding:10px;"></div>
+        </div>
+
+        <div class="card full" id="panel-crypto-influencer" style="display:none;">
+            <div class="kpi-title">Crypto Influencer Monitor (Trading Dashboard)</div>
+            <div class="small" id="cryptoInfluencerSummary" style="margin-bottom:8px;">Loading influencer status...</div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Net Signal</th>
+                        <th>Manip Score</th>
+                        <th>Coordination</th>
+                        <th>Top Influencers</th>
+                    </tr>
+                </thead>
+                <tbody id="cryptoInfluencerRows"></tbody>
+            </table>
+
+            <div class="small" style="margin-top:10px;">Influencer-triggered Pump Trades</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Entry</th>
+                        <th>Exit</th>
+                        <th>PnL</th>
+                        <th>Influencer Actors</th>
+                    </tr>
+                </thead>
+                <tbody id="cryptoInfluencerTradesRows"></tbody>
+            </table>
+        </div>
+
+        <div class="card half" id="panel-asx-metrics" style="display:none;">
+            <div class="kpi-title">ASX Metrics</div>
+            <div class="grid" style="gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));">
+                <div>
+                    <div class="small">Latest Equity</div>
+                    <div class="kpi-value" id="asxEquity">-</div>
+                </div>
+                <div>
+                    <div class="small">Open Positions</div>
+                    <div class="kpi-value" id="asxOpen">-</div>
+                </div>
+                <div>
+                    <div class="small">Trade Rows</div>
+                    <div class="kpi-value" id="asxRows">-</div>
+                </div>
+                <div>
+                    <div class="small">Buy / Sell</div>
+                    <div class="kpi-value" id="asxBuySell">-</div>
+                </div>
+            </div>
+            <div class="small" style="margin-top:8px;">Top Symbols: <span id="asxTopSymbols">-</span></div>
+            <div class="small" style="margin-top:6px;">Heartbeat: <span id="asxHeartbeat">-</span></div>
+        </div>
+
+        <div class="card full" id="panel-asx-trades" style="display:none;">
+            <div class="kpi-title">Recent ASX Bot Trades</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>Symbol</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                        <th>PnL</th>
+                        <th>Portfolio Value</th>
+                    </tr>
+                </thead>
+                <tbody id="asxTradesRows"></tbody>
+            </table>
+        </div>
+
+        <div class="card half" id="panel-forex-metrics" style="display:none;">
+            <div class="kpi-title">Forex Metrics</div>
+            <div class="grid" style="gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));">
+                <div>
+                    <div class="small">BUY Mentions</div>
+                    <div class="kpi-value" id="forexBuy">-</div>
+                </div>
+                <div>
+                    <div class="small">SELL Mentions</div>
+                    <div class="kpi-value" id="forexSell">-</div>
+                </div>
+                <div>
+                    <div class="small">HOLD Mentions</div>
+                    <div class="kpi-value" id="forexHold">-</div>
+                </div>
+                <div>
+                    <div class="small">Errors Detected</div>
+                    <div class="kpi-value" id="forexError">-</div>
+                </div>
+            </div>
+            <div class="small" style="margin-top:8px;">Pair Mentions: <span id="forexPairs">-</span></div>
+            <div class="small" style="margin-top:6px;">Latest Portfolio Note: <span id="forexPortfolioLine">-</span></div>
+            <div class="small" style="margin-top:6px;">Heartbeat: <span id="forexHeartbeat">-</span></div>
+        </div>
+
+        <div class="card full" id="panel-forex-logs" style="display:none;">
+            <div class="kpi-title">Recent Forex Bot Log</div>
+            <div id="forexLog" class="mono" style="white-space:pre-wrap;font-size:0.84rem;line-height:1.42;max-height:280px;overflow-y:auto;background:#121a24;border:1px solid #2a3440;border-radius:8px;padding:10px;"></div>
+        </div>
+
+        <div class="card half" id="panel-tech-metrics" style="display:none;">
+            <div class="kpi-title">Research Bot Metrics</div>
+            <div class="grid" style="gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));">
+                <div>
+                    <div class="small">Ranked Candidates</div>
+                    <div class="kpi-value" id="techCandidates">-</div>
+                </div>
+                <div>
+                    <div class="small">Average Probability</div>
+                    <div class="kpi-value" id="techAvgProb">-</div>
+                </div>
+                <div>
+                    <div class="small">Min Probability Threshold</div>
+                    <div class="kpi-value" id="techMinProb">-</div>
+                </div>
+                <div>
+                    <div class="small">Generated At (UTC)</div>
+                    <div class="kpi-value" id="techGeneratedAt" style="font-size:1rem;">-</div>
+                </div>
+            </div>
+            <div class="small" style="margin-top:8px;">Top Themes: <span id="techTopThemes">-</span></div>
+        </div>
+
+        <div class="card full" id="panel-tech-candidates" style="display:none;">
+            <div class="kpi-title">Top Emerging Technology Candidates</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Probability</th>
+                        <th>Impact Score</th>
+                        <th>Theme</th>
+                        <th>Title</th>
+                        <th>Published</th>
+                    </tr>
+                </thead>
+                <tbody id="techCandidatesRows"></tbody>
+            </table>
+        </div>
+
+        <div class="card full" id="panel-tech-log" style="display:none;">
+            <div class="kpi-title">Recent Research Bot Log</div>
+            <div id="techResearchLog" class="mono" style="white-space:pre-wrap;font-size:0.84rem;line-height:1.42;max-height:280px;overflow-y:auto;background:#121a24;border:1px solid #2a3440;border-radius:8px;padding:10px;"></div>
+        </div>
+
+        <div class="card full">
+            <div class="kpi-title">Bot Copilot</div>
+            <div id="chatLog"></div>
+            <div class="chat-row">
+                <textarea id="chatInput" placeholder="Ask: what has the trading bot learned? what strategy is crypto using? how to improve returns?"></textarea>
+                <button onclick="sendCopilot()">Ask</button>
+            </div>
+        </div>
+
+        <div class="card full" id="panel-action-center" style="display:none;">
+            <div class="kpi-title">Copilot Action Center (Safe Ops)</div>
+            <div class="grid" style="gap:8px;grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;">
+                <div>
+                    <div class="small">Action</div>
+                    <select id="actionType" style="width:100%;background:#0f1620;color:#d7e0ea;border:1px solid #2d3947;border-radius:6px;padding:7px;" onchange="onActionTypeChange()">
+                        <option value="health_check">health_check</option>
+                        <option value="git_pull">git_pull</option>
+                        <option value="restart_api">restart_api</option>
+                        <option value="restart_dashboard">restart_dashboard</option>
+                        <option value="bot_control">bot_control</option>
+                    </select>
+                </div>
+                <div id="actionBotWrap" style="display:none;">
+                    <div class="small">Bot</div>
+                    <select id="actionBot" style="width:100%;background:#0f1620;color:#d7e0ea;border:1px solid #2d3947;border-radius:6px;padding:7px;">
+                        <option value="trading_bot">trading_bot</option>
+                        <option value="crypto_bot">crypto_bot</option>
+                        <option value="tech_research_bot">tech_research_bot</option>
+                    </select>
+                </div>
+                <div id="actionBotActionWrap" style="display:none;">
+                    <div class="small">Bot Action</div>
+                    <select id="actionBotAction" style="width:100%;background:#0f1620;color:#d7e0ea;border:1px solid #2d3947;border-radius:6px;padding:7px;">
+                        <option value="start">start</option>
+                        <option value="stop">stop</option>
+                        <option value="restart">restart</option>
+                        <option value="reset_faults">reset_faults</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="small" style="display:flex;gap:7px;align-items:center;">
+                        <input type="checkbox" id="actionConfirm"> Confirm state change
+                    </label>
+                </div>
+                <div>
+                    <button class="ctl-btn" style="padding:8px 10px;font-size:0.82rem;" onclick="runCopilotAction()">Run Action</button>
+                    <button class="ctl-btn" style="padding:8px 10px;font-size:0.82rem;margin-left:6px;" onclick="runCopilotAction(true)">Preview (Dry Run)</button>
+                </div>
+            </div>
+            <div id="actionStatus" class="ctl-status" style="margin-top:8px;">Ready. Use health_check first, then confirmed actions.</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;margin-bottom:6px;">
+                <div class="small">Action History</div>
+                <button id="copyDryRunPlanBtn" class="ctl-btn" style="padding:6px 9px;font-size:0.78rem;opacity:0.55;" onclick="copyLastDryRunPlan()" disabled>Copy Last Dry-Run Plan</button>
+            </div>
+            <div id="actionHistory" class="mono" style="white-space:pre-wrap;font-size:0.82rem;line-height:1.4;max-height:220px;overflow-y:auto;background:#121a24;border:1px solid #2a3440;border-radius:8px;padding:10px;">(no actions yet)</div>
+        </div>
+    </div>
+
+    <script>
+        let activeTab = 'trading_bot';
+        let dashboardData = null;
+        let actionHistoryItems = [];
+        let latestDryRunPlanText = '';
+        let _healthCheckRunning = false;
+
+        function statusPill(el, ok, label) {
+            el.textContent = label;
+            el.className = `status-pill ${ok ? 'ok' : 'bad'}`;
+        }
+
+        function researchPill(el, active, label) {
+            el.textContent = label;
+            el.className = `research-pill ${active ? 'ok' : 'bad'}`;
+        }
+
+        function money(v) {
+            const n = Number(v || 0);
+            return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function _ageMinutes(isoLike) {
+            if (!isoLike) return null;
+            const ts = Date.parse(String(isoLike));
+            if (!Number.isFinite(ts)) return null;
+            return Math.max(0, (Date.now() - ts) / 60000.0);
+        }
+
+        function _healthSeverityRank(severity) {
+            if (severity === 'critical') return 3;
+            if (severity === 'warn') return 2;
+            return 1;
+        }
+
+        function _setHealthState(id, severity, text) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.remove('healthy', 'warn', 'critical');
+            const s = (severity === 'critical' || severity === 'warn') ? severity : 'healthy';
+            el.classList.add(s);
+            el.textContent = text || '-';
+        }
+
+        function _driftHealth(drift) {
+            const d = drift || {};
+            if (d.drift_active) {
+                return { severity: 'critical', label: `ACTIVE (${(Number(d.combined_multiplier || 1) * 100).toFixed(0)}%)` };
+            }
+            const psi = Number(d.psi_max || 0);
+            if (psi >= 0.10) return { severity: 'warn', label: `WATCH (psi=${psi.toFixed(2)})` };
+            return { severity: 'healthy', label: 'OK' };
+        }
+
+        function _execHealth(exec) {
+            const e = exec || {};
+            const sample = Number(e.sample_size || 0);
+            const rej = Number(e.rejection_rate || 0);
+            const p95Slip = e.p95_slippage_bps === null || e.p95_slippage_bps === undefined ? null : Number(e.p95_slippage_bps);
+            if (sample < 10) return { severity: 'warn', label: `WARMUP (${sample})` };
+            if (rej > 0.25 || (p95Slip !== null && p95Slip > 100)) return { severity: 'critical', label: 'DEGRADED' };
+            if (rej > 0.10 || (p95Slip !== null && p95Slip > 30)) return { severity: 'warn', label: 'WATCH' };
+            return { severity: 'healthy', label: 'OK' };
+        }
+
+        function _promotionHealth(promo) {
+            const p = promo || {};
+            const stage = String(p.stage || 'unknown').toLowerCase();
+            if (stage === 'live') return { severity: 'healthy', label: 'LIVE' };
+            if (stage === 'canary') return { severity: 'warn', label: 'CANARY' };
+            if (stage === 'shadow') return { severity: 'warn', label: 'SHADOW' };
+            return { severity: 'warn', label: stage.toUpperCase() };
+        }
+
+        function _pacingHealth(pacing) {
+            const p = pacing || {};
+            const mult = Number(p.multiplier || 1);
+            const reasons = Array.isArray(p.last_reasons) ? p.last_reasons : [];
+            if (mult <= 0.50) return { severity: 'critical', label: `DEFENSIVE (${mult.toFixed(2)})` };
+            if (mult <= 0.85) return { severity: 'warn', label: `CAUTIOUS (${mult.toFixed(2)})` };
+            if (reasons.length) return { severity: 'warn', label: `WATCH (${mult.toFixed(2)})` };
+            return { severity: 'healthy', label: `OK (${mult.toFixed(2)})` };
+        }
+
+        function _guardrailHealth(guardrails, botKey) {
+            const byBot = (guardrails && guardrails.kill_switch_by_bot) || {};
+            const globalStop = !!(guardrails && guardrails.global_hard_stop_active);
+            const botStop = !!byBot[botKey];
+            if (globalStop || botStop) return { severity: 'critical', label: 'ACTIVE' };
+            return { severity: 'healthy', label: 'OK' };
+        }
+
+        function openApiPath(path) {
+            window.open(path, '_blank', 'noopener,noreferrer');
+        }
+
+        async function runSystemHealthCheck(manual = false) {
+            if (_healthCheckRunning) return;
+            _healthCheckRunning = true;
+            const notesEl = document.getElementById('systemHealthNotes');
+            if (manual && notesEl) notesEl.textContent = 'Notes: running checks...';
+            try {
+                const [guardrails, exec, promo, pacing] = await Promise.all([
+                    fetch('/portfolio_guardrails').then(r => r.json()),
+                    fetch('/execution_quality').then(r => r.json()),
+                    fetch('/promotion_status').then(r => r.json()),
+                    fetch('/capital_pacing').then(r => r.json()),
+                ]);
+
+                const tGuard = _guardrailHealth(guardrails, 'trading_bot');
+                const cGuard = _guardrailHealth(guardrails, 'crypto_bot');
+                const tDrift = _driftHealth((guardrails || {}).drift_state ? guardrails.drift_state.trading_bot : {});
+                const cDrift = _driftHealth((guardrails || {}).drift_state ? guardrails.drift_state.crypto_bot : {});
+                const tExec = _execHealth((exec || {}).trading_bot || {});
+                const cExec = _execHealth((exec || {}).crypto_bot || {});
+                const tPromo = _promotionHealth((promo || {}).trading_bot || {});
+                const cPromo = _promotionHealth((promo || {}).crypto_bot || {});
+                const tPace = _pacingHealth((pacing || {}).trading_bot || {});
+                const cPace = _pacingHealth((pacing || {}).crypto_bot || {});
+
+                _setHealthState('healthTradingGuardrail', tGuard.severity, tGuard.label);
+                _setHealthState('healthTradingDrift', tDrift.severity, tDrift.label);
+                _setHealthState('healthTradingExec', tExec.severity, tExec.label);
+                _setHealthState('healthTradingPromotion', tPromo.severity, tPromo.label);
+                _setHealthState('healthTradingPacing', tPace.severity, tPace.label);
+
+                _setHealthState('healthCryptoGuardrail', cGuard.severity, cGuard.label);
+                _setHealthState('healthCryptoDrift', cDrift.severity, cDrift.label);
+                _setHealthState('healthCryptoExec', cExec.severity, cExec.label);
+                _setHealthState('healthCryptoPromotion', cPromo.severity, cPromo.label);
+                _setHealthState('healthCryptoPacing', cPace.severity, cPace.label);
+
+                const severities = [
+                    tGuard, tDrift, tExec, tPromo, tPace,
+                    cGuard, cDrift, cExec, cPromo, cPace,
+                ].map(x => x.severity);
+                const worst = severities.sort((a, b) => _healthSeverityRank(b) - _healthSeverityRank(a))[0] || 'healthy';
+                const summaryText = worst === 'critical' ? 'SYSTEM DEGRADED' : (worst === 'warn' ? 'SYSTEM WATCH' : 'SYSTEM HEALTHY');
+                _setHealthState('systemHealthSummary', worst, summaryText);
+
+                const tsEl = document.getElementById('systemHealthTimestamp');
+                if (tsEl) {
+                    const nowIso = new Date().toISOString().replace('T', ' ').slice(0, 19);
+                    tsEl.textContent = `Last check: ${nowIso} UTC`;
+                }
+                if (notesEl) {
+                    const tSample = Number(((exec || {}).trading_bot || {}).sample_size || 0);
+                    const cSample = Number(((exec || {}).crypto_bot || {}).sample_size || 0);
+                    notesEl.textContent = `Notes: execution samples trading=${tSample}, crypto=${cSample}`;
+                }
+            } catch (e) {
+                _setHealthState('systemHealthSummary', 'critical', 'CHECK FAILED');
+                const tsEl = document.getElementById('systemHealthTimestamp');
+                if (tsEl) tsEl.textContent = 'Last check: failed';
+                if (notesEl) notesEl.textContent = `Notes: ${e}`;
+            } finally {
+                _healthCheckRunning = false;
+            }
+        }
+
+        function setTab(tab) {
+            activeTab = tab;
+            document.getElementById('tab-trading').classList.toggle('active', tab === 'trading_bot');
+            document.getElementById('tab-crypto').classList.toggle('active', tab === 'crypto_bot');
+            document.getElementById('tab-asx').classList.toggle('active', tab === 'asx_bot');
+            document.getElementById('tab-forex').classList.toggle('active', tab === 'forex_bot');
+            document.getElementById('tab-tech').classList.toggle('active', tab === 'tech_research_bot');
+            document.getElementById('tab-both').classList.toggle('active', tab === 'both');
+
+            const showTrading = tab === 'trading_bot' || tab === 'both';
+            const showCrypto = tab === 'crypto_bot' || tab === 'both';
+            const showAsx = tab === 'asx_bot' || tab === 'both';
+            const showForex = tab === 'forex_bot' || tab === 'both';
+            const showTech = tab === 'tech_research_bot';
+            document.getElementById('panel-trades').style.display = showTrading ? '' : 'none';
+            document.getElementById('panel-trading-metrics').style.display = showTrading ? '' : 'none';
+            document.getElementById('panel-logs').style.display = showCrypto ? '' : 'none';
+            document.getElementById('panel-crypto-metrics').style.display = showCrypto ? '' : 'none';
+            document.getElementById('panel-crypto-influencer').style.display = showCrypto ? '' : 'none';
+            document.getElementById('panel-asx-metrics').style.display = showAsx ? '' : 'none';
+            document.getElementById('panel-asx-trades').style.display = showAsx ? '' : 'none';
+            document.getElementById('panel-forex-metrics').style.display = showForex ? '' : 'none';
+            document.getElementById('panel-forex-logs').style.display = showForex ? '' : 'none';
+            document.getElementById('panel-tech-metrics').style.display = showTech ? '' : 'none';
+            document.getElementById('panel-tech-candidates').style.display = showTech ? '' : 'none';
+            document.getElementById('panel-tech-log').style.display = showTech ? '' : 'none';
+            document.getElementById('panel-investment').style.display = tab === 'both' ? '' : 'none';
+            document.getElementById('panel-investment-summary').style.display = tab === 'both' ? '' : 'none';
+            document.getElementById('panel-projection').style.display = tab === 'both' ? '' : 'none';
+            document.getElementById('panel-compounding').style.display = tab === 'both' ? '' : 'none';
+            document.getElementById('panel-action-center').style.display = tab === 'both' ? '' : 'none';
+            _updateResearchLogPanel();
+        }
+
+        function _money2(v) {
+            return '$' + Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function renderInvestmentChart(investment) {
+            const svg = document.getElementById('investmentSvg');
+            const meta = document.getElementById('investmentMeta');
+            const tooltip = document.getElementById('investmentTooltip');
+            if (!svg || !meta) return;
+
+            const portfolio = (investment?.portfolio || []).map(p => Number(p.v || 0));
+            const cash = (investment?.cash || []).map(p => Number(p.v || 0));
+            const buyingPower = (investment?.buying_power || []).map(p => Number(p.v || 0));
+            const times = (investment?.portfolio || []).map(p => String(p.t || ''));
+
+            if (!portfolio.length) {
+                svg.innerHTML = '<text x="50%" y="50%" fill="#93a4b7" text-anchor="middle" dominant-baseline="middle" font-size="14">No investment data yet</text>';
+                if (tooltip) tooltip.style.display = 'none';
+                meta.textContent = 'No trading equity history found yet. Start the trading bot and the chart will populate.';
+                return;
+            }
+
+            const width = 1000;
+            const height = 220;
+            const padLeft = 40;
+            const padRight = 14;
+            const padTop = 14;
+            const padBottom = 26;
+            const innerW = width - padLeft - padRight;
+            const innerH = height - padTop - padBottom;
+
+            const allVals = portfolio.concat(cash.length ? cash : portfolio, buyingPower.length ? buyingPower : []);
+            let minV = Math.min(...allVals);
+            let maxV = Math.max(...allVals);
+            if (!Number.isFinite(minV) || !Number.isFinite(maxV)) {
+                minV = 0;
+                maxV = 1;
+            }
+            if (minV === maxV) {
+                minV -= 1;
+                maxV += 1;
+            }
+
+            const xFor = (i, n) => padLeft + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
+            const yFor = (v) => padTop + (1 - (v - minV) / (maxV - minV)) * innerH;
+            const pathFor = (arr) => arr.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i, arr.length).toFixed(2)} ${yFor(v).toFixed(2)}`).join(' ');
+
+            const portfolioPath = pathFor(portfolio);
+            const cashPath = cash.length ? pathFor(cash) : '';
+            const buyingPowerPath = buyingPower.length ? pathFor(buyingPower) : '';
+
+            const grid = [0, 0.25, 0.5, 0.75, 1].map(t => {
+                const y = (padTop + t * innerH).toFixed(2);
+                return `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#243140" stroke-width="1" />`;
+            }).join('');
+
+            const yMinLabel = _money2(minV);
+            const yMaxLabel = _money2(maxV);
+
+            svg.innerHTML = `
+                <rect x="0" y="0" width="${width}" height="${height}" fill="transparent"></rect>
+                ${grid}
+                <path d="${portfolioPath}" fill="none" stroke="#3ecf8e" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"></path>
+                ${cashPath ? `<path d="${cashPath}" fill="none" stroke="#49a5ff" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"></path>` : ''}
+                ${buyingPowerPath ? `<path d="${buyingPowerPath}" fill="none" stroke="#d29922" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"></path>` : ''}
+                <line id="invCursorLine" x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${padTop + innerH}" stroke="#c9d6e2" stroke-dasharray="5 4" stroke-width="1.8" visibility="hidden"></line>
+                <line id="invPortfolioGuide" x1="${padLeft}" y1="${padTop + innerH}" x2="${width - padRight}" y2="${padTop + innerH}" stroke="#3ecf8e" stroke-dasharray="6 5" stroke-width="1.2" opacity="0.9" visibility="hidden"></line>
+                <line id="invCashGuide" x1="${padLeft}" y1="${padTop + innerH}" x2="${width - padRight}" y2="${padTop + innerH}" stroke="#49a5ff" stroke-dasharray="6 5" stroke-width="1.2" opacity="0.9" visibility="hidden"></line>
+                <line id="invBuyingPowerGuide" x1="${padLeft}" y1="${padTop + innerH}" x2="${width - padRight}" y2="${padTop + innerH}" stroke="#d29922" stroke-dasharray="6 5" stroke-width="1.2" opacity="0.9" visibility="hidden"></line>
+                <circle id="invPortfolioPoint" cx="${padLeft}" cy="${padTop + innerH}" r="4" fill="#3ecf8e" stroke="#0b1117" stroke-width="1.5" visibility="hidden"></circle>
+                <circle id="invCashPoint" cx="${padLeft}" cy="${padTop + innerH}" r="4" fill="#49a5ff" stroke="#0b1117" stroke-width="1.5" visibility="hidden"></circle>
+                <circle id="invBuyingPowerPoint" cx="${padLeft}" cy="${padTop + innerH}" r="4" fill="#d29922" stroke="#0b1117" stroke-width="1.5" visibility="hidden"></circle>
+                <text x="6" y="${padTop + 10}" fill="#93a4b7" font-size="11">${yMaxLabel}</text>
+                <text x="6" y="${height - 8}" fill="#93a4b7" font-size="11">${yMinLabel}</text>
+            `;
+
+            const cursorLine = document.getElementById('invCursorLine');
+            const portfolioGuide = document.getElementById('invPortfolioGuide');
+            const cashGuide = document.getElementById('invCashGuide');
+            const buyingPowerGuide = document.getElementById('invBuyingPowerGuide');
+            const portfolioPoint = document.getElementById('invPortfolioPoint');
+            const cashPoint = document.getElementById('invCashPoint');
+            const buyingPowerPoint = document.getElementById('invBuyingPowerPoint');
+
+            const hideHover = () => {
+                if (cursorLine) cursorLine.setAttribute('visibility', 'hidden');
+                if (portfolioGuide) portfolioGuide.setAttribute('visibility', 'hidden');
+                if (cashGuide) cashGuide.setAttribute('visibility', 'hidden');
+                if (buyingPowerGuide) buyingPowerGuide.setAttribute('visibility', 'hidden');
+                if (portfolioPoint) portfolioPoint.setAttribute('visibility', 'hidden');
+                if (cashPoint) cashPoint.setAttribute('visibility', 'hidden');
+                if (buyingPowerPoint) buyingPowerPoint.setAttribute('visibility', 'hidden');
+                if (tooltip) tooltip.style.display = 'none';
+            };
+
+            const formatTs = (raw) => {
+                if (!raw) return '-';
+                const d = new Date(raw);
+                if (Number.isNaN(d.getTime())) return raw.replace('T', ' ').slice(0, 19);
+                return d.toLocaleString();
+            };
+
+            svg.onmousemove = (evt) => {
+                const rect = svg.getBoundingClientRect();
+                if (!rect.width || !rect.height) return;
+
+                const xPx = evt.clientX - rect.left;
+                const yPx = evt.clientY - rect.top;
+                const x = (xPx / rect.width) * width;
+                if (x < padLeft || x > (width - padRight)) {
+                    hideHover();
+                    return;
+                }
+
+                const maxIndex = portfolio.length - 1;
+                const idx = Math.max(0, Math.min(maxIndex, Math.round(((x - padLeft) / innerW) * maxIndex)));
+                const xPoint = xFor(idx, portfolio.length);
+                const pVal = portfolio[idx];
+                const cVal = (idx < cash.length) ? cash[idx] : null;
+                const bpVal = (idx < buyingPower.length) ? buyingPower[idx] : null;
+                const pY = yFor(pVal);
+
+                if (cursorLine) {
+                    cursorLine.setAttribute('x1', xPoint.toFixed(2));
+                    cursorLine.setAttribute('x2', xPoint.toFixed(2));
+                    cursorLine.setAttribute('visibility', 'visible');
+                }
+                if (portfolioPoint) {
+                    portfolioPoint.setAttribute('cx', xPoint.toFixed(2));
+                    portfolioPoint.setAttribute('cy', pY.toFixed(2));
+                    portfolioPoint.setAttribute('visibility', 'visible');
+                }
+                if (portfolioGuide) {
+                    portfolioGuide.setAttribute('y1', pY.toFixed(2));
+                    portfolioGuide.setAttribute('y2', pY.toFixed(2));
+                    portfolioGuide.setAttribute('visibility', 'visible');
+                }
+
+                if (cashPoint) {
+                    if (cVal === null || cVal === undefined) {
+                        cashPoint.setAttribute('visibility', 'hidden');
+                        if (cashGuide) cashGuide.setAttribute('visibility', 'hidden');
+                    } else {
+                        cashPoint.setAttribute('cx', xPoint.toFixed(2));
+                        cashPoint.setAttribute('cy', yFor(cVal).toFixed(2));
+                        cashPoint.setAttribute('visibility', 'visible');
+                        if (cashGuide) {
+                            const cashY = yFor(cVal).toFixed(2);
+                            cashGuide.setAttribute('y1', cashY);
+                            cashGuide.setAttribute('y2', cashY);
+                            cashGuide.setAttribute('visibility', 'visible');
+                        }
+                    }
+                }
+
+                if (buyingPowerPoint) {
+                    if (bpVal === null || bpVal === undefined) {
+                        buyingPowerPoint.setAttribute('visibility', 'hidden');
+                        if (buyingPowerGuide) buyingPowerGuide.setAttribute('visibility', 'hidden');
+                    } else {
+                        buyingPowerPoint.setAttribute('cx', xPoint.toFixed(2));
+                        buyingPowerPoint.setAttribute('cy', yFor(bpVal).toFixed(2));
+                        buyingPowerPoint.setAttribute('visibility', 'visible');
+                        if (buyingPowerGuide) {
+                            const bpY = yFor(bpVal).toFixed(2);
+                            buyingPowerGuide.setAttribute('y1', bpY);
+                            buyingPowerGuide.setAttribute('y2', bpY);
+                            buyingPowerGuide.setAttribute('visibility', 'visible');
+                        }
+                    }
+                }
+
+                if (tooltip) {
+                    tooltip.innerHTML =
+                        `<div style="color:#93a4b7;margin-bottom:4px;">${formatTs(times[idx])}</div>` +
+                        `<div><span style="color:#3ecf8e;">Sell-all value</span>: <strong>${_money2(pVal)}</strong></div>` +
+                        `<div><span style="color:#49a5ff;">Cash</span>: <strong>${cVal === null || cVal === undefined ? '-' : _money2(cVal)}</strong></div>` +
+                        `<div><span style="color:#d29922;">Buying power</span>: <strong>${bpVal === null || bpVal === undefined ? '-' : _money2(bpVal)}</strong></div>`;
+
+                    tooltip.style.display = 'block';
+                    const wrap = svg.parentElement;
+                    const wrapRect = wrap.getBoundingClientRect();
+                    const ttW = tooltip.offsetWidth || 220;
+                    const ttH = tooltip.offsetHeight || 70;
+                    let left = xPx + 14;
+                    let top = yPx + 14;
+                    if (left + ttW > wrapRect.width - 4) left = xPx - ttW - 14;
+                    if (top + ttH > wrapRect.height - 4) top = yPx - ttH - 14;
+                    if (left < 4) left = 4;
+                    if (top < 4) top = 4;
+                    tooltip.style.left = `${left}px`;
+                    tooltip.style.top = `${top}px`;
+                }
+            };
+
+            svg.onmouseleave = hideHover;
+
+            const latest = investment?.latest || {};
+            const pct = Number(latest.window_pct_change || 0);
+            const pctText = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+            meta.innerHTML = `Latest sell-all value: <strong>${_money2(latest.portfolio_value)}</strong> · Cash: <strong>${_money2(latest.cash_balance)}</strong> · Buying power: <strong>${_money2(latest.buying_power)}</strong> · Window change: <strong>${_money2(latest.window_net_change)} (${pctText})</strong> · Crypto realized PnL: <strong>${_money2(latest.crypto_cum_realized_pnl)}</strong>`;
+        }
+
+        function renderInvestmentSummary(investment) {
+            const latest = investment?.latest || {};
+            document.getElementById('investedCapital').textContent = _money2(latest.invested_capital);
+            document.getElementById('unrealizedPnl').textContent = _money2(latest.estimated_unrealized_pnl);
+            document.getElementById('tradingRealizedPnl').textContent = _money2(latest.estimated_trading_realized_pnl);
+            document.getElementById('netLiquidationValue').textContent = _money2(latest.portfolio_value);
+            document.getElementById('netLiquidatedPnl').textContent = _money2(latest.estimated_net_pnl_if_liquidated);
+            document.getElementById('combinedRealizedPnl').textContent = _money2(latest.estimated_combined_realized_pnl);
+        }
+
+        function renderCompoundingChart(investment) {
+            const svg = document.getElementById('compoundingSvg');
+            const tooltip = document.getElementById('compoundingTooltip');
+            const meta = document.getElementById('compoundingMeta');
+            const observedLegend = document.getElementById('observedBotLegend');
+            if (!svg) return;
+
+            try {
+
+                        const scenarios = [
+                            { rate: 0.08, color: '#93a4b7', label: '8% (index)' },
+                            { rate: 0.12, color: '#49a5ff', label: '12% (conservative)' },
+                            { rate: 0.15, color: '#f59f00', label: '15% (moderate)' },
+                            { rate: 0.20, color: '#3ecf8e', label: '20% (target)' },
+                        ];
+
+                        const observedAnnualized = Number(investment?.projection?.annualized_return);
+                        const observedWindowDays = Number(investment?.projection?.window_days || 0);
+                        const observedAvailable = Number.isFinite(observedAnnualized) && observedAnnualized > -0.95;
+                        if (observedAvailable) {
+                            scenarios.push({
+                                rate: observedAnnualized,
+                                color: '#ff7b72',
+                                label: `Observed (${(observedAnnualized * 100).toFixed(1)}%)`,
+                                observed: true,
+                            });
+                        }
+                        if (observedLegend) {
+                            observedLegend.style.display = observedAvailable ? '' : 'none';
+                            observedLegend.innerHTML = `<span class="legend-dot" style="background:#ff7b72;"></span>Observed Bot Rate (${observedAvailable ? (observedAnnualized * 100).toFixed(1) : '-'}%)`;
+                        }
+
+                        const monthlyContrib = 1000;
+                        const years = 20;
+                        const months = years * 12;
+
+                        const data = scenarios.map(s => {
+                            const monthlyRate = Math.pow(1 + s.rate, 1 / 12) - 1;
+                            const points = [0];
+                            let value = 0;
+                            for (let m = 1; m <= months; m++) {
+                                value = value * (1 + monthlyRate) + monthlyContrib;
+                                if (m % 12 === 0) points.push(value);
+                            }
+                            return { ...s, points };
+                        });
+
+                        const allValues = data.reduce((acc, d) => acc.concat(d.points), []);
+                        const maxV = Math.max(1, ...allValues);
+
+                        const width = 1000;
+                        const height = 280;
+                        const padLeft = 60;
+                        const padRight = 16;
+                        const padTop = 16;
+                        const padBottom = 34;
+                        const innerW = width - padLeft - padRight;
+                        const innerH = height - padTop - padBottom;
+
+                        const xFor = yr => padLeft + (yr / years) * innerW;
+                        const yFor = v => padTop + (1 - v / maxV) * innerH;
+
+                        const yTicks = [0, 0.25, 0.5, 0.75, 1.0];
+                        let gridLines = '';
+                        let yLabels = '';
+                        yTicks.forEach(t => {
+                            const y = padTop + (1 - t) * innerH;
+                            const v = t * maxV;
+                            gridLines += `<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${width - padRight}" y2="${y.toFixed(1)}" stroke="#243140" stroke-width="1" stroke-dasharray="${t > 0 ? '3,4' : ''}"/>`;
+                            const label = v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k' : v.toFixed(0);
+                            yLabels += `<text x="${(padLeft - 4).toFixed(1)}" y="${(y + 4).toFixed(1)}" fill="#93a4b7" font-size="10" text-anchor="end">$${label}</text>`;
+                        });
+
+                        let xLabels = '';
+                        for (let yr = 0; yr <= years; yr += 5) {
+                            xLabels += `<text x="${xFor(yr).toFixed(1)}" y="${(height - 8).toFixed(1)}" fill="#93a4b7" font-size="11" text-anchor="middle">yr ${yr}</text>`;
+                        }
+
+                        let lines = '';
+                        data.forEach(d => {
+                            const pts = d.points.map((v, i) => `${xFor(i).toFixed(1)},${yFor(v).toFixed(1)}`).join(' ');
+                            lines += `<polyline fill="none" stroke="${d.color}" stroke-width="2.5" points="${pts}" opacity="0.9"/>`;
+                        });
+
+                        let dots = '';
+                        data.forEach(d => {
+                            const finalV = d.points[years];
+                            dots += `<circle cx="${xFor(years).toFixed(1)}" cy="${yFor(finalV).toFixed(1)}" r="5" fill="${d.color}"/>`;
+                            const label = _money2(finalV);
+                            const labelX = (xFor(years) - 6).toFixed(1);
+                            const labelY = (yFor(finalV) - 9).toFixed(1);
+                            dots += `<text x="${labelX}" y="${labelY}" fill="${d.color}" font-size="10" text-anchor="end">${label}</text>`;
+                        });
+
+                        let overlays = '';
+                        for (let yr = 0; yr <= years; yr++) {
+                            const x1 = xFor(yr - 0.5);
+                            const x2 = xFor(yr + 0.5);
+                            const safeX1 = Math.max(padLeft, x1);
+                            const safeX2 = Math.min(width - padRight, x2);
+                            overlays += `<rect class="comp-hover" data-yr="${yr}" x="${safeX1.toFixed(1)}" y="${padTop}" width="${(safeX2 - safeX1).toFixed(1)}" height="${innerH}" fill="transparent" style="cursor:crosshair;"/>`;
+                        }
+
+                        svg.innerHTML = `
+                            ${gridLines}
+                            ${yLabels}
+                            ${xLabels}
+                            ${lines}
+                            ${dots}
+                            ${overlays}
+                            <line x1="${padLeft}" y1="${padTop + innerH}" x2="${width - padRight}" y2="${padTop + innerH}" stroke="#2d3947" stroke-width="1"/>
+                            <line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${padTop + innerH}" stroke="#2d3947" stroke-width="1"/>
+                        `;
+
+                        const cursorLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        cursorLine.setAttribute('stroke', '#49a5ff');
+                        cursorLine.setAttribute('stroke-width', '1');
+                        cursorLine.setAttribute('stroke-dasharray', '4,3');
+                        cursorLine.setAttribute('opacity', '0.5');
+                        cursorLine.style.display = 'none';
+                        svg.appendChild(cursorLine);
+
+                        const hide = () => {
+                            if (tooltip) tooltip.style.display = 'none';
+                            cursorLine.style.display = 'none';
+                        };
+
+                        Array.from(svg.querySelectorAll('.comp-hover')).forEach(el => {
+                            el.addEventListener('mousemove', evt => {
+                                const yr = Number(el.getAttribute('data-yr'));
+                                const x = xFor(yr);
+                                cursorLine.setAttribute('x1', x.toFixed(1));
+                                cursorLine.setAttribute('y1', padTop);
+                                cursorLine.setAttribute('x2', x.toFixed(1));
+                                cursorLine.setAttribute('y2', padTop + innerH);
+                                cursorLine.style.display = '';
+                                if (!tooltip) return;
+                                const invested = yr * 12 * monthlyContrib;
+                                let html = `<div><strong>Year ${yr}</strong> — Invested: <strong>${_money2(invested)}</strong></div><hr style="border-color:#2d3947;margin:4px 0;">`;
+                                data.forEach(d => {
+                                    const v = d.points[yr];
+                                    const gain = v - invested;
+                                    const gainSign = gain >= 0 ? '+' : '';
+                                    html += `<div style="color:${d.color}">${d.label}: <strong>${_money2(v)}</strong> <span style="color:#93a4b7;font-size:0.9em;">(${gainSign}${_money2(gain)})</span></div>`;
+                                });
+                                tooltip.innerHTML = html;
+                                tooltip.style.display = 'block';
+                                const rect = svg.getBoundingClientRect();
+                                const wrap = svg.parentElement.getBoundingClientRect();
+                                const ex = evt.clientX - rect.left;
+                                const ey = evt.clientY - rect.top;
+                                const ttW = tooltip.offsetWidth || 260;
+                                const ttH = tooltip.offsetHeight || 110;
+                                let left = ex + 16;
+                                let top = ey - ttH / 2;
+                                if (left + ttW > wrap.width - 4) left = ex - ttW - 16;
+                                if (top < 4) top = 4;
+                                if (top + ttH > wrap.height - 4) top = wrap.height - ttH - 4;
+                                tooltip.style.left = `${left}px`;
+                                tooltip.style.top = `${top}px`;
+                            });
+                            el.addEventListener('mouseleave', hide);
+                        });
+                        svg.addEventListener('mouseleave', hide);
+            } catch (err) {
+                svg.innerHTML = '<text x="50%" y="50%" fill="#93a4b7" text-anchor="middle" dominant-baseline="middle" font-size="14">Compounding projection unavailable</text>';
+                if (tooltip) tooltip.style.display = 'none';
+            }
+
+            if (meta) {
+                const annualized = Number(investment?.projection?.annualized_return);
+                const windowDays = Number(investment?.projection?.window_days || 0);
+                const observedTxt = (Number.isFinite(annualized) && annualized > -0.95)
+                    ? ` | Observed bot rate: ${(annualized * 100).toFixed(2)}% over ${windowDays.toFixed(1)} days`
+                    : '';
+                meta.textContent = `$240,000 total invested over 20 years at $1,000/month from $0. Hover to see year-by-year values.${observedTxt}`;
+            }
+        }
+
+                function renderProjectionChart(investment) {
+            const svg = document.getElementById('projectionSvg');
+            const tooltip = document.getElementById('projectionTooltip');
+            const meta = document.getElementById('projectionMeta');
+            const projection = investment?.projection || {};
+            const points = projection.horizons || [];
+            const baseLiquidated = Number(projection.base_liquidated_value || investment?.latest?.portfolio_value || 0);
+
+            if (!svg || !meta) return;
+            if (!points.length) {
+                svg.innerHTML = '<text x="50%" y="50%" fill="#93a4b7" text-anchor="middle" dominant-baseline="middle" font-size="14">No projection data yet</text>';
+                if (tooltip) tooltip.style.display = 'none';
+                meta.textContent = 'Projection data unavailable.';
+                return;
+            }
+
+            const width = 1000;
+            const height = 220;
+            const padLeft = 46;
+            const padRight = 16;
+            const padTop = 16;
+            const padBottom = 34;
+            const innerW = width - padLeft - padRight;
+            const innerH = height - padTop - padBottom;
+
+            const values = points.map(p => Number(p.projected_value || 0));
+            const maxV = Math.max(1, ...values);
+            const barW = Math.max(28, Math.min(100, innerW / (points.length * 1.6)));
+            const step = points.length > 1 ? innerW / points.length : innerW;
+            const yFor = (v) => padTop + (1 - (v / maxV)) * innerH;
+
+            let bars = '';
+            let labels = '';
+            points.forEach((p, i) => {
+                const cx = padLeft + (i + 0.5) * step;
+                const h = Math.max(2, innerH * (Number(p.projected_value || 0) / maxV));
+                const y = padTop + innerH - h;
+                bars += `<rect class="proj-bar" data-idx="${i}" x="${(cx - barW / 2).toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" fill="#f59f00" opacity="0.88" rx="4" ry="4"></rect>`;
+                labels += `<text x="${cx.toFixed(2)}" y="${(height - 10).toFixed(2)}" fill="#93a4b7" font-size="11" text-anchor="middle">${p.years}y</text>`;
+            });
+
+            svg.innerHTML = `
+                <rect x="0" y="0" width="${width}" height="${height}" fill="transparent"></rect>
+                <line x1="${padLeft}" y1="${padTop + innerH}" x2="${width - padRight}" y2="${padTop + innerH}" stroke="#243140" stroke-width="1"></line>
+                ${bars}
+                ${labels}
+                <text x="8" y="${padTop + 10}" fill="#93a4b7" font-size="11">${_money2(maxV)}</text>
+                <text x="8" y="${height - 8}" fill="#93a4b7" font-size="11">$0.00</text>
+            `;
+
+            const barEls = Array.from(svg.querySelectorAll('.proj-bar'));
+            const hide = () => {
+                if (tooltip) tooltip.style.display = 'none';
+                barEls.forEach(el => el.setAttribute('opacity', '0.88'));
+            };
+
+            barEls.forEach((el) => {
+                el.addEventListener('mousemove', (evt) => {
+                    const idx = Number(el.getAttribute('data-idx') || 0);
+                    const p = points[idx] || {};
+                    el.setAttribute('opacity', '1');
+                    if (!tooltip) return;
+                    const delta = Number(p.projected_delta_value || 0);
+                    const deltaSign = delta >= 0 ? '+' : '-';
+                    tooltip.innerHTML =
+                        `<div><strong>${p.years}-Year Projection</strong></div>` +
+                        `<div>Liquidated Baseline: <strong>${_money2(baseLiquidated)}</strong></div>` +
+                        `<div>Projected Value: <strong>${_money2(p.projected_value)}</strong></div>` +
+                        `<div>Projected Return: <strong>${Number(p.projected_return_pct || 0).toFixed(2)}%</strong></div>` +
+                        `<div>Dollar Change: <strong>${deltaSign}${_money2(Math.abs(delta))}</strong></div>`;
+                    tooltip.style.display = 'block';
+
+                    const rect = svg.getBoundingClientRect();
+                    const wrap = svg.parentElement.getBoundingClientRect();
+                    const x = evt.clientX - rect.left;
+                    const y = evt.clientY - rect.top;
+                    const ttW = tooltip.offsetWidth || 220;
+                    const ttH = tooltip.offsetHeight || 70;
+                    let left = x + 14;
+                    let top = y + 14;
+                    if (left + ttW > wrap.width - 4) left = x - ttW - 14;
+                    if (top + ttH > wrap.height - 4) top = y - ttH - 14;
+                    if (left < 4) left = 4;
+                    if (top < 4) top = 4;
+                    tooltip.style.left = `${left}px`;
+                    tooltip.style.top = `${top}px`;
+                });
+                el.addEventListener('mouseleave', hide);
+            });
+            svg.onmouseleave = hide;
+
+            const annualizedPct = Number(projection.annualized_return || 0) * 100;
+            const windowDays = Number(projection.window_days || 0);
+            const assumption = projection.assumptions || '';
+            const sample = points[0] || {};
+            const sampleDelta = Number(sample.projected_delta_value || 0);
+            const sampleDeltaSign = sampleDelta >= 0 ? '+' : '-';
+            meta.innerHTML =
+                `Baseline liquidated value now: <strong>${_money2(baseLiquidated)}</strong>. ` +
+                `Observed annualized return: <strong>${annualizedPct.toFixed(2)}%</strong> over <strong>${windowDays.toFixed(1)} days</strong>. ` +
+                `Example (5y): <strong>${Number(sample.projected_return_pct || 0).toFixed(2)}%</strong> means <strong>${sampleDeltaSign}${_money2(Math.abs(sampleDelta))}</strong> from the current liquidated value. ` +
+                `${assumption}`;
+        }
+
+        function appendMsg(role, text) {
+            const log = document.getElementById('chatLog');
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            div.textContent = text;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function _researchMap() {
+            return {
+                trading_bot: dashboardData?.trading_bot?.metrics?.research || {},
+                crypto_bot: dashboardData?.crypto_bot?.metrics?.research || {},
+                asx_bot: dashboardData?.asx_bot?.metrics?.research || {},
+                forex_bot: dashboardData?.forex_bot?.metrics?.research || {},
+                tech_research_bot: dashboardData?.tech_research_bot?.metrics?.research || {},
+            };
+        }
+
+        function _updateResearchLogPanel() {
+            if (!dashboardData) return;
+            const research = _researchMap();
+            const bots = ['trading_bot', 'crypto_bot', 'tech_research_bot'];
+            const targetBots = activeTab === 'both' ? bots : [activeTab];
+            const title = activeTab === 'both' ? 'Recent Research Log (Combined: Trading/Crypto/Research)' : `Recent Research Log (${activeTab})`;
+            const out = [];
+
+            for (const bot of targetBots) {
+                const lines = research[bot]?.recent_lines || [];
+                if (targetBots.length > 1) out.push(`[${bot}]`);
+                if (lines.length) {
+                    out.push(...lines);
+                } else {
+                    out.push('(no research log lines yet)');
+                }
+                if (targetBots.length > 1) out.push('');
+            }
+
+            document.getElementById('researchLogTitle').textContent = title;
+            document.getElementById('researchLog').textContent = out.join('\n').trim() || '(no research log lines yet)';
+        }
+
+        function renderDashboard(d) {
+            dashboardData = d;
+            const s = d.status || {};
+            const t = d.trading_bot?.metrics || {};
+            const c = d.crypto_bot?.metrics || {};
+            const a = d.asx_bot?.metrics || {};
+            const f = d.forex_bot?.metrics || {};
+            const tr = d.tech_research_bot?.metrics || {};
+            const inv = d.investment || {};
+            const auto = d.autonomy?.bots || {};
+            const research = _researchMap();
+            const scorecard = d.return_scorecard || {};
+            const fmtHeartbeat = (h) => {
+                const sig = (h?.last_signal || '-').toUpperCase();
+                const seen = h?.last_seen ? String(h.last_seen).replace('T', ' ').slice(0, 19) : '-';
+                return `signal=${sig}, seen=${seen}`;
+            };
+
+            statusPill(document.getElementById('tradingStatus'), !!s.trading_bot?.running, s.trading_bot?.running ? 'Running' : 'Stopped');
+            statusPill(document.getElementById('cryptoStatus'), !!s.crypto_bot?.running, s.crypto_bot?.running ? 'Running' : 'Stopped');
+            const combinedRunning = [s.trading_bot?.running, s.crypto_bot?.running, s.tech_research_bot?.running].every(Boolean);
+            const combinedRunningCount = [s.trading_bot?.running, s.crypto_bot?.running, s.tech_research_bot?.running].filter(Boolean).length;
+            statusPill(
+                document.getElementById('allStatus'),
+                combinedRunning,
+                combinedRunning ? '3/3 Running' : `${combinedRunningCount}/3 Running`
+            );
+            statusPill(document.getElementById('asxStatus'), !!s.asx_bot?.running, s.asx_bot?.running ? 'Running' : 'Stopped');
+            statusPill(document.getElementById('forexStatus'), !!s.forex_bot?.running, s.forex_bot?.running ? 'Running' : 'Stopped');
+            statusPill(document.getElementById('techStatus'), !!s.tech_research_bot?.running, s.tech_research_bot?.running ? 'Running' : 'Stopped');
+
+            // ===== Health Alerts Table =====
+            (function renderHealthAlerts() {
+                const bots = [
+                    { id: 'trading_bot',      label: 'Trading Bot' },
+                    { id: 'crypto_bot',       label: 'Crypto Bot' },
+                    { id: 'asx_bot',          label: 'ASX Bot' },
+                    { id: 'forex_bot',        label: 'Forex Bot' },
+                    { id: 'tech_research_bot',label: 'Research Bot' },
+                ];
+                const tbody = document.getElementById('healthAlertsRows');
+                const badge = document.getElementById('healthAlertsBadge');
+                if (!tbody) return;
+                let totalAlerts = 0;
+                const rows = bots.map(bot => {
+                    const info  = s[bot.id] || {};
+                    const h     = info.health || {};
+                    const running = !!info.running;
+
+                    const ok   = '<span style="color:#3ecf8e;font-weight:700;">✓ OK</span>';
+                    const warn = (t) => `<span style="color:#f59f00;font-weight:700;">⚠ ${t}</span>`;
+                    const bad  = (t) => `<span style="color:#ff7b72;font-weight:700;">✗ ${t}</span>`;
+
+                    const processBadge = running ? ok : bad('Stopped');
+                    const errCount = (h.error_lines || []).length;
+                    const errBadge = errCount > 0 ? bad(`${errCount} error(s)`) : ok;
+
+                    const ksBadge = h.kill_switch_active ? bad('Active') : ok;
+
+                    let silentBadge = ok;
+                    const staleSecs = h.log_stale_seconds;
+                    if (h.log_silent_critical)      silentBadge = bad(`${Math.round(staleSecs/3600)}h silent`);
+                    else if (h.log_silent)          silentBadge = warn(`${Math.round(staleSecs/60)}m silent`);
+                    else if (!h.log_exists)         silentBadge = warn('No log file');
+                    else if (staleSecs !== null && staleSecs !== undefined)
+                        silentBadge = `<span style="color:#93a4b7;">~${staleSecs < 60 ? staleSecs+'s' : Math.round(staleSecs/60)+'m'} ago</span>`;
+
+                    const srcBadge = h.source_degraded
+                        ? warn('Degraded' + (h.source_confidence !== null && h.source_confidence !== undefined ? ` (conf ${(h.source_confidence).toFixed(2)})` : ''))
+                        : ok;
+
+                    // count total problems
+                    if (!running) totalAlerts++;
+                    if (errCount > 0) totalAlerts++;
+                    if (h.kill_switch_active) totalAlerts++;
+                    if (h.log_silent) totalAlerts++;
+                    if (h.source_degraded) totalAlerts++;
+
+                    const detailParts = [];
+                    (h.error_lines || []).forEach(l => detailParts.push(l.slice(0, 120)));
+                    if (h.kill_switch_active) detailParts.push('Kill-switch is active — entries paused.');
+                    if (h.source_degraded) detailParts.push('Political feed confidence degraded.');
+                    const details = detailParts.length
+                        ? `<span class="mono small" style="display:block;white-space:pre-wrap;color:#ff9c7c;max-height:70px;overflow-y:auto;">${detailParts.map(l=>`• ${l}`).join('\n')}</span>`
+                        : '<span style="color:#5a7a99;font-size:0.8rem;">—</span>';
+
+                    return `<tr>
+                        <td style="font-weight:600;">${bot.label}</td>
+                        <td>${processBadge}</td>
+                        <td>${errBadge}</td>
+                        <td>${ksBadge}</td>
+                        <td>${silentBadge}</td>
+                        <td>${srcBadge}</td>
+                        <td>${details}</td>
+                    </tr>`;
+                });
+                tbody.innerHTML = rows.join('');
+                if (totalAlerts > 0) {
+                    badge.style.display = '';
+                    badge.textContent = `${totalAlerts} alert${totalAlerts > 1 ? 's' : ''}`;
+                } else {
+                    badge.style.display = 'none';
+                }
+            })();
+
+            const researchActive = (r) => Boolean(r?.enabled && r?.key_set && Number(r?.mentions || 0) > 0);
+            const rTrading = research.trading_bot || {};
+            const rCrypto = research.crypto_bot || {};
+            const rAsx = research.asx_bot || {};
+            const rForex = research.forex_bot || {};
+            const rTech = research.tech_research_bot || {};
+            const techAgeMin = _ageMinutes(tr.generated_at);
+            const techFresh = techAgeMin !== null && techAgeMin <= 30;
+            const techStale = techAgeMin !== null && techAgeMin > 30;
+            const techOperational = techFresh || researchActive(rTech);
+            const activeCount = [
+                researchActive(rTrading),
+                researchActive(rCrypto),
+                techOperational,
+            ].filter(Boolean).length;
+
+            researchPill(
+                document.getElementById('tradingResearchStatus'),
+                researchActive(rTrading),
+                researchActive(rTrading) ? 'Research: Active' : 'Research: Idle'
+            );
+            researchPill(
+                document.getElementById('cryptoResearchStatus'),
+                researchActive(rCrypto),
+                researchActive(rCrypto) ? 'Research: Active' : 'Research: Idle'
+            );
+            researchPill(
+                document.getElementById('asxResearchStatus'),
+                researchActive(rAsx),
+                researchActive(rAsx) ? 'Research: Active' : 'Research: Idle'
+            );
+            researchPill(
+                document.getElementById('forexResearchStatus'),
+                researchActive(rForex),
+                researchActive(rForex) ? 'Research: Active' : 'Research: Idle'
+            );
+            researchPill(
+                document.getElementById('techResearchStatus'),
+                !techStale && techOperational,
+                techStale
+                    ? `Research: Stale (${Math.round(techAgeMin)}m)`
+                    : (techOperational
+                        ? (techAgeMin !== null ? `Research: Active (${Math.round(techAgeMin)}m)` : 'Research: Active')
+                        : 'Research: Idle')
+            );
+            researchPill(
+                document.getElementById('allResearchStatus'),
+                activeCount > 0,
+                activeCount > 0 ? `Research: ${activeCount}/3 Active` : 'Research: Idle'
+            );
+
+            document.getElementById('tradingEquity').textContent = money(t.latest_equity);
+            document.getElementById('tradingOpen').textContent = String(t.open_positions ?? 0);
+            document.getElementById('tradingRows').textContent = String(t.trade_rows ?? 0);
+            document.getElementById('tradingBuySell').textContent = `${t.buy_count ?? 0} / ${t.sell_count ?? 0}`;
+            document.getElementById('tradingTopSymbols').textContent = (t.top_symbols || []).map(x => `${x.symbol} (${x.count})`).join(', ') || '-';
+            document.getElementById('tradingHeartbeat').textContent = fmtHeartbeat(t.heartbeat || {});
+            document.getElementById('tradingTopHeartbeat').textContent = fmtHeartbeat(t.heartbeat || {});
+
+            const rows = (t.recent_trades || []).slice().reverse().slice(0, 12);
+            const tbody = document.getElementById('tradesRows');
+            tbody.innerHTML = rows.length ? rows.map(r => `
+                <tr>
+                    <td class="mono">${(r.timestamp || '').replace('T', ' ').slice(0, 19)}</td>
+                    <td>${r.action || ''}</td>
+                    <td>${r.symbol || ''}</td>
+                    <td>${r.qty || ''}</td>
+                    <td>${r.price || ''}</td>
+                    <td>${r.predicted_change_pct || ''}</td>
+                    <td>${r.buy_signals || 0}/${r.sell_signals || 0}</td>
+                </tr>`).join('') : '<tr><td colspan="7" class="small">No trades logged yet</td></tr>';
+
+            document.getElementById('cryptoBuy').textContent = String(c.signal_mentions?.buy ?? 0);
+            document.getElementById('cryptoSell').textContent = String(c.signal_mentions?.sell ?? 0);
+            document.getElementById('cryptoHold').textContent = String(c.signal_mentions?.hold ?? 0);
+            document.getElementById('cryptoError').textContent = c.has_error ? 'Yes' : 'No';
+            document.getElementById('cryptoPairs').textContent = (c.pair_mentions || []).map(x => `${x.pair} (${x.count})`).join(', ') || '-';
+            const cr = c.crypto_research || {};
+            document.getElementById('cryptoResearchScore').textContent = (cr.weighted_score === null || cr.weighted_score === undefined) ? '-' : Number(cr.weighted_score).toFixed(2);
+            document.getElementById('cryptoResearchHeadlines').textContent = String(cr.headlines ?? 0);
+            document.getElementById('cryptoResearchTopics').textContent = (cr.dominant_topics || []).join(', ') || '-';
+            document.getElementById('cryptoResearchNotes').textContent = cr.strategy_notes || '-';
+            document.getElementById('cryptoHeartbeat').textContent = fmtHeartbeat(c.heartbeat || {});
+            document.getElementById('cryptoTopHeartbeat').textContent = fmtHeartbeat(c.heartbeat || {});
+            document.getElementById('cryptoLog').textContent = (c.recent_log_lines || []).join('\n') || '(no recent log lines)';
+
+            const influencer = c.influencer || {};
+            const snap = influencer.snapshot || {};
+            const global = snap.global || {};
+            const bySymbol = snap.by_symbol || {};
+            const symbolRows = Object.entries(bySymbol).sort((a, b) => Number(b[1]?.manipulation_score || 0) - Number(a[1]?.manipulation_score || 0));
+            const dominant = String(global.dominant_signal || 'neutral').toUpperCase();
+            const manipDetected = Boolean(global.manipulation_detected);
+            const actors = Number(global.influencer_count || 0);
+            const coord = Number(global.coordination_count || 0);
+            const avgNet = Number(global.avg_net_signal || 0);
+            const lastSeen = influencer.last_seen ? String(influencer.last_seen).replace('T', ' ').slice(0, 19) : '-';
+
+            document.getElementById('cryptoInfluencerSummary').textContent =
+                `Signal=${dominant} | manipulation=${manipDetected ? 'YES' : 'no'} | actors=${actors} | coordination=${coord} | avg_net=${avgNet.toFixed(2)} | updated=${lastSeen}`;
+
+            document.getElementById('cryptoInfluencerRows').innerHTML = symbolRows.length
+                ? symbolRows.slice(0, 12).map(([sym, s]) => `
+                    <tr>
+                        <td>${sym}</td>
+                        <td>${Number(s.net_signal || 0).toFixed(2)}</td>
+                        <td>${Number(s.manipulation_score || 0).toFixed(2)}</td>
+                        <td>${s.coordination ? 'Yes' : 'No'}</td>
+                        <td>${(s.top_influencers || []).join(', ') || '-'}</td>
+                    </tr>`).join('')
+                : '<tr><td colspan="5" class="small">No active influencer symbol signals in current window.</td></tr>';
+
+            const pumpTrades = influencer.pump_trades || [];
+            document.getElementById('cryptoInfluencerTradesRows').innerHTML = pumpTrades.length
+                ? pumpTrades.slice().reverse().slice(0, 12).map((r) => `
+                    <tr>
+                        <td>${r.symbol || ''}</td>
+                        <td class="mono">${(r.entry_time || '').replace('T', ' ').slice(0, 19) || '-'}</td>
+                        <td class="mono">${(r.exit_time || '').replace('T', ' ').slice(0, 19) || '-'}</td>
+                        <td>${money(r.pnl || 0)}</td>
+                        <td>${r.influencer_actors || '-'}</td>
+                    </tr>`).join('')
+                : '<tr><td colspan="5" class="small">No influencer-triggered pump trades logged yet.</td></tr>';
+
+            document.getElementById('asxEquity').textContent = money(a.latest_equity);
+            document.getElementById('asxOpen').textContent = String(a.open_positions ?? 0);
+            document.getElementById('asxRows').textContent = String(a.trade_rows ?? 0);
+            document.getElementById('asxBuySell').textContent = `${a.buy_count ?? 0} / ${a.sell_count ?? 0}`;
+            document.getElementById('asxTopSymbols').textContent = (a.top_symbols || []).map(x => `${x.symbol} (${x.count})`).join(', ') || '-';
+            document.getElementById('asxHeartbeat').textContent = fmtHeartbeat(a.heartbeat || {});
+            document.getElementById('asxTopHeartbeat').textContent = fmtHeartbeat(a.heartbeat || {});
+            const asxRows = (a.recent_trades || []).slice().reverse().slice(0, 12);
+            const asxTbody = document.getElementById('asxTradesRows');
+            asxTbody.innerHTML = asxRows.length ? asxRows.map(r => `
+                <tr>
+                    <td class="mono">${(r.timestamp || '').replace('T', ' ').slice(0, 19)}</td>
+                    <td>${r.action || ''}</td>
+                    <td>${r.symbol || ''}</td>
+                    <td>${r.qty || ''}</td>
+                    <td>${r.price || ''}</td>
+                    <td>${r.pnl || ''}</td>
+                    <td>${r.portfolio_value || ''}</td>
+                </tr>`).join('') : '<tr><td colspan="7" class="small">No ASX trades logged yet</td></tr>';
+
+            document.getElementById('forexBuy').textContent = String(f.signal_mentions?.buy ?? 0);
+            document.getElementById('forexSell').textContent = String(f.signal_mentions?.sell ?? 0);
+            document.getElementById('forexHold').textContent = String(f.signal_mentions?.hold ?? 0);
+            document.getElementById('forexError').textContent = f.has_error ? 'Yes' : 'No';
+            document.getElementById('forexPairs').textContent = (f.pair_mentions || []).map(x => `${x.pair} (${x.count})`).join(', ') || '-';
+            document.getElementById('forexPortfolioLine').textContent = f.latest_portfolio_line || '-';
+            document.getElementById('forexHeartbeat').textContent = fmtHeartbeat(f.heartbeat || {});
+            document.getElementById('forexTopHeartbeat').textContent = fmtHeartbeat(f.heartbeat || {});
+            document.getElementById('forexLog').textContent = (f.recent_log_lines || []).join('\n') || '(no recent log lines)';
+
+            document.getElementById('techTopHeartbeat').textContent = fmtHeartbeat(tr.heartbeat || {});
+            document.getElementById('techCandidates').textContent = String(tr.candidate_count ?? 0);
+            document.getElementById('techAvgProb').textContent = (tr.avg_probability === null || tr.avg_probability === undefined) ? '-' : `${(Number(tr.avg_probability) * 100).toFixed(1)}%`;
+            document.getElementById('techMinProb').textContent = (tr.min_probability_threshold === null || tr.min_probability_threshold === undefined) ? '-' : `${(Number(tr.min_probability_threshold) * 100).toFixed(1)}%`;
+            document.getElementById('techGeneratedAt').textContent = tr.generated_at ? String(tr.generated_at).replace('T', ' ').slice(0, 19) : '-';
+            document.getElementById('techTopThemes').textContent = (tr.top_themes || []).map(x => `${x.theme} (${x.count})`).join(', ') || '-';
+            const techRows = (tr.top_candidates || []).slice(0, 12);
+            const techTbody = document.getElementById('techCandidatesRows');
+            techTbody.innerHTML = techRows.length ? techRows.map((x, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${(Number(x.probability_significant_impact || 0) * 100).toFixed(1)}%</td>
+                    <td>${Number(x.impact_score || 0).toFixed(2)}</td>
+                    <td>${x.theme || ''}</td>
+                    <td>${x.link ? `<a href="${x.link}" target="_blank" rel="noopener noreferrer" style="color:#9ed0ff;">${x.title || ''}</a>` : (x.title || '')}</td>
+                    <td class="mono">${(x.published_iso || x.published || '').toString().replace('T', ' ').slice(0, 19) || '-'}</td>
+                </tr>`).join('') : '<tr><td colspan="6" class="small">No ranked emerging technology candidates yet</td></tr>';
+            document.getElementById('techResearchLog').textContent = (tr.recent_log_lines || []).join('\n') || '(no recent log lines)';
+
+            const seenValues = [t.heartbeat?.last_seen, c.heartbeat?.last_seen, tr.heartbeat?.last_seen].filter(Boolean);
+            document.getElementById('allTopHeartbeat').textContent = seenValues.length ? `seen ${seenValues.length}/3 bots` : '-';
+
+            const fmtPct = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '-' : `${(Number(v) * 100).toFixed(1)}%`;
+            const fmtNum = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '-' : Number(v).toFixed(2);
+            const actionsHtml = (bot) => `
+                <div class="ctl-actions">
+                    <button class="ctl-btn" onclick="controlBot('${bot}', 'start')">Start</button>
+                    <button class="ctl-btn" onclick="controlBot('${bot}', 'stop')">Stop</button>
+                    <button class="ctl-btn" onclick="controlBot('${bot}', 'restart')">Restart</button>
+                    <button class="ctl-btn" onclick="controlBot('${bot}', 'reset_faults')">Reset Faults</button>
+                </div>`;
+            const autonomyRows = ['trading_bot', 'crypto_bot'].map(bot => {
+                const x = auto[bot] || {};
+                const m = x.metrics || {};
+                const imp = x.improvement || {};
+                const checksText = `${x.pass_count ?? 0}/${x.total_checks ?? 0}`;
+                const blocked = (x.blocked_symbols || []).join(', ') || '-';
+                const topAlloc = imp.top_allocations || '-';
+                const improveMsg = imp.last_message || '-';
+                const improveSeen = imp.last_seen || '';
+                const allow = x.allow_entries === null || x.allow_entries === undefined ? '-' : (x.allow_entries ? 'Yes' : 'No');
+                const regime = x.regime || {};
+                const regimeLabel = regime.label || '-';
+                const regimeConfidence = (regime.confidence === null || regime.confidence === undefined || Number.isNaN(Number(regime.confidence)))
+                    ? ''
+                    : ` (${(Number(regime.confidence) * 100).toFixed(0)}%)`;
+                let researchTrigger = '-';
+                if (bot === 'trading_bot') {
+                    const rf = t.research_force_buy || {};
+                    if (rf.triggered_recently) {
+                        const p = (rf.last_probability === null || rf.last_probability === undefined || Number.isNaN(Number(rf.last_probability)))
+                            ? ''
+                            : ` p=${(Number(rf.last_probability) * 100).toFixed(1)}%`;
+                        const impTxt = (rf.last_impact_score === null || rf.last_impact_score === undefined || Number.isNaN(Number(rf.last_impact_score)))
+                            ? ''
+                            : ` impact=${Number(rf.last_impact_score).toFixed(2)}`;
+                        const evTxt = (rf.last_evidence_count === null || rf.last_evidence_count === undefined || Number.isNaN(Number(rf.last_evidence_count)))
+                            ? ''
+                            : ` evidence=${Number(rf.last_evidence_count)}`;
+                        researchTrigger = `Yes (${rf.trigger_count_recent || 0})${p}${impTxt}${evTxt}`;
+                    } else {
+                        researchTrigger = 'No';
+                    }
+                }
+                return `
+                    <tr>
+                        <td>${bot}</td>
+                        <td><span class="mode-pill">${x.mode || 'unknown'}</span></td>
+                        <td>${regimeLabel}${regimeConfidence}</td>
+                        <td>${x.score ?? '-'}</td>
+                        <td>${allow}</td>
+                        <td>${checksText}</td>
+                        <td>${fmtPct(m.win_rate_7d)} / ${fmtNum(m.profit_factor_7d)} / ${fmtPct(m.max_drawdown_7d)}</td>
+                        <td>${blocked}</td>
+                        <td class="mono">${topAlloc}</td>
+                        <td class="mono">${improveMsg}${improveSeen ? ` (${improveSeen})` : ''}</td>
+                        <td class="mono">${researchTrigger}</td>
+                        <td>${actionsHtml(bot)}</td>
+                    </tr>`;
+            });
+            document.getElementById('autonomyRows').innerHTML = autonomyRows.join('');
+
+            const learningRows = ['trading_bot', 'crypto_bot'].map(bot => {
+                const x = auto[bot] || {};
+                const l = x.learning || {};
+                const modeStats = l.mode_stats || {};
+                const aggr = modeStats.aggressive || {};
+                const wl = `${aggr.wins ?? 0}/${aggr.losses ?? 0}`;
+                const success = (aggr.success_rate === null || aggr.success_rate === undefined) ? '-' : `${(Number(aggr.success_rate) * 100).toFixed(0)}%`;
+                const pnlSum = (aggr.pnl_sum === null || aggr.pnl_sum === undefined || Number.isNaN(Number(aggr.pnl_sum))) ? '-' : Number(aggr.pnl_sum).toFixed(2);
+                const cooldown = l.aggressive_cooldown_until || '-';
+                return `
+                    <tr>
+                        <td>${bot}</td>
+                        <td><span class="mode-pill">${l.last_mode || '-'}</span></td>
+                        <td>${wl}</td>
+                        <td>${success}</td>
+                        <td>${pnlSum}</td>
+                        <td class="mono">${cooldown}</td>
+                    </tr>`;
+            });
+            document.getElementById('autonomyLearningRows').innerHTML = learningRows.join('');
+
+            const scoreTarget = (scorecard.target_return_pct === null || scorecard.target_return_pct === undefined || Number.isNaN(Number(scorecard.target_return_pct)))
+                ? 20
+                : Number(scorecard.target_return_pct);
+            document.getElementById('scorecardTarget').textContent = `${scoreTarget.toFixed(0)}%`;
+            document.getElementById('scorecardGenerated').textContent = scorecard.generated_at
+                ? String(scorecard.generated_at).replace('T', ' ').slice(0, 19)
+                : '-';
+
+            const scoreRows = ['trading_bot', 'crypto_bot'].map(bot => {
+                const s = scorecard[bot] || {};
+                const win = (s.win_rate_7d === null || s.win_rate_7d === undefined || Number.isNaN(Number(s.win_rate_7d)))
+                    ? '-'
+                    : `${(Number(s.win_rate_7d) * 100).toFixed(1)}%`;
+                const pf = (s.profit_factor_7d === null || s.profit_factor_7d === undefined || Number.isNaN(Number(s.profit_factor_7d)))
+                    ? '-'
+                    : Number(s.profit_factor_7d).toFixed(2);
+                const est = (s.estimated_return_7d_pct === null || s.estimated_return_7d_pct === undefined || Number.isNaN(Number(s.estimated_return_7d_pct)))
+                    ? '-'
+                    : `${Number(s.estimated_return_7d_pct).toFixed(2)}%`;
+                const prob = (s.probability_target_hit === null || s.probability_target_hit === undefined || Number.isNaN(Number(s.probability_target_hit)))
+                    ? '-'
+                    : `${(Number(s.probability_target_hit) * 100).toFixed(1)}%`;
+                return `
+                    <tr>
+                        <td>${bot}</td>
+                        <td>${s.closed_trades_7d ?? '-'}</td>
+                        <td>${win}</td>
+                        <td>${pf}</td>
+                        <td>${est}</td>
+                        <td>${s.data_quality || '-'}</td>
+                        <td>${prob}</td>
+                    </tr>`;
+            });
+            document.getElementById('scorecardRows').innerHTML = scoreRows.join('');
+
+            const researchRows = ['trading_bot', 'crypto_bot', 'tech_research_bot'].map(bot => {
+                const r = research[bot] || {};
+                const providerEngine = `${r.provider || '-'} / ${r.engine || '-'}`;
+                const enabled = r.enabled ? 'Yes' : 'No';
+                const keySet = r.key_set ? 'Yes' : 'No';
+                const mentions = r.mentions ?? 0;
+                const nonzero = r.nonzero_ext_mentions ?? 0;
+                const lastSeen = r.last_seen || '-';
+                const latest = r.latest_line || '-';
+                return `
+                    <tr>
+                        <td>${bot}</td>
+                        <td>${providerEngine}</td>
+                        <td>${enabled}</td>
+                        <td>${keySet}</td>
+                        <td>${mentions}</td>
+                        <td>${nonzero}</td>
+                        <td class="mono">${lastSeen}</td>
+                        <td class="mono">${latest}</td>
+                    </tr>`;
+            });
+            document.getElementById('researchRows').innerHTML = researchRows.join('');
+            _updateResearchLogPanel();
+            renderInvestmentChart(inv);
+            renderInvestmentSummary(inv);
+            renderProjectionChart(inv);
+            renderCompoundingChart(inv);
+
+            document.getElementById('lastUpdated').textContent = `Last updated: ${(d.timestamp || '').replace('T', ' ').slice(0, 19)} UTC`;
+        }
+
+        async function controlBot(bot, action) {
+            const statusEl = document.getElementById('controlStatus');
+            if (statusEl) statusEl.textContent = `Sending ${action} to ${bot}...`;
+            try {
+                const res = await fetch(`/bot_control?bot=${encodeURIComponent(bot)}&action=${encodeURIComponent(action)}`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (statusEl) {
+                    statusEl.textContent = data?.message || `${action} request completed for ${bot}.`;
+                }
+                refreshDashboard();
+            } catch (e) {
+                if (statusEl) statusEl.textContent = `Control action failed for ${bot}: ${e}`;
+            }
+        }
+
+        function onActionTypeChange() {
+            const actionType = document.getElementById('actionType')?.value || 'health_check';
+            const showBot = actionType === 'bot_control';
+            document.getElementById('actionBotWrap').style.display = showBot ? '' : 'none';
+            document.getElementById('actionBotActionWrap').style.display = showBot ? '' : 'none';
+        }
+
+        function pushActionHistory(text) {
+            const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+            actionHistoryItems.unshift(`[${ts}] ${text}`);
+            if (actionHistoryItems.length > 30) actionHistoryItems = actionHistoryItems.slice(0, 30);
+            const el = document.getElementById('actionHistory');
+            if (el) el.textContent = actionHistoryItems.length ? actionHistoryItems.join('\n\n') : '(no actions yet)';
+        }
+
+        function _setCopyDryRunButtonEnabled(enabled) {
+            const btn = document.getElementById('copyDryRunPlanBtn');
+            if (!btn) return;
+            btn.disabled = !enabled;
+            btn.style.opacity = enabled ? '1' : '0.55';
+        }
+
+        async function _copyTextToClipboard(text) {
+            if (!text) return false;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            ta.style.pointerEvents = 'none';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            let ok = false;
+            try {
+                ok = document.execCommand('copy');
+            } catch (_) {
+                ok = false;
+            }
+            document.body.removeChild(ta);
+            return ok;
+        }
+
+        async function copyLastDryRunPlan() {
+            const statusEl = document.getElementById('actionStatus');
+            if (!latestDryRunPlanText) {
+                if (statusEl) statusEl.textContent = 'No dry-run plan available yet. Run Preview (Dry Run) first.';
+                return;
+            }
+            try {
+                const ok = await _copyTextToClipboard(latestDryRunPlanText);
+                if (statusEl) statusEl.textContent = ok
+                    ? 'Copied last dry-run command bundle to clipboard.'
+                    : 'Unable to copy automatically. Clipboard permission may be blocked.';
+            } catch (e) {
+                if (statusEl) statusEl.textContent = `Copy failed: ${e}`;
+            }
+        }
+
+        async function runCopilotAction(dryRun = false) {
+            const actionType = document.getElementById('actionType')?.value || 'health_check';
+            const bot = document.getElementById('actionBot')?.value || '';
+            const botAction = document.getElementById('actionBotAction')?.value || '';
+            const confirmTicked = !!document.getElementById('actionConfirm')?.checked;
+            const statusEl = document.getElementById('actionStatus');
+
+            const isStateChange = actionType !== 'health_check';
+            if (!dryRun && isStateChange && !confirmTicked) {
+                if (statusEl) statusEl.textContent = 'State-changing actions require the Confirm checkbox.';
+                return;
+            }
+
+            if (!dryRun && isStateChange) {
+                const label = actionType === 'bot_control' ? `${actionType} (${bot}/${botAction})` : actionType;
+                const ok = window.confirm(`Run confirmed action: ${label}?`);
+                if (!ok) {
+                    if (statusEl) statusEl.textContent = 'Action canceled.';
+                    return;
+                }
+            }
+
+            const payload = {
+                action: actionType,
+                confirm: !dryRun && isStateChange,
+                dry_run: !!dryRun,
+            };
+            if (actionType === 'bot_control') {
+                payload.bot = bot;
+                payload.bot_action = botAction;
+            }
+
+            if (statusEl) statusEl.textContent = `${dryRun ? 'Previewing' : 'Running'} ${actionType}...`;
+            try {
+                const res = await fetch('/copilot_action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                const ok = !!data?.ok;
+                const msg = data?.result?.message || data?.message || 'No message';
+                if (statusEl) statusEl.textContent = ok ? `OK: ${msg}` : `Failed: ${msg}`;
+                let summary = actionType === 'bot_control'
+                    ? `${actionType} ${bot}/${botAction} -> ${ok ? 'ok' : 'fail'} | ${msg}`
+                    : `${actionType} -> ${ok ? 'ok' : 'fail'} | ${msg}`;
+                if (dryRun) {
+                    const planItems = (data?.result?.preview?.plan || []).map(x => String(x || '').trim()).filter(Boolean);
+                    const planned = planItems.join(' ; ');
+                    if (planItems.length) {
+                        latestDryRunPlanText = ['# Copilot dry-run plan', ...planItems].join('\n');
+                        _setCopyDryRunButtonEnabled(true);
+                    }
+                    summary = `[dry-run] ${summary}${planned ? ` | plan: ${planned}` : ''}`;
+                }
+                pushActionHistory(summary);
+                if (!dryRun) refreshDashboard();
+            } catch (e) {
+                const err = `Action error: ${e}`;
+                if (statusEl) statusEl.textContent = err;
+                pushActionHistory(`${dryRun ? '[dry-run] ' : ''}${actionType} -> fail | ${err}`);
+            }
+        }
+
+        // ── OBSERVABILITY HELPERS ──────────────────────────────────────
+
+        function _obsAgo(isoTs) {
+            if (!isoTs) return '';
+            const d = new Date(isoTs);
+            if (isNaN(d)) return '';
+            const secs = Math.floor((Date.now() - d.getTime()) / 1000);
+            if (secs < 60) return `${secs}s ago`;
+            if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+            if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+            return `${Math.floor(secs / 86400)}d ago`;
+        }
+
+        function _obsSecsAgo(seconds) {
+            if (seconds === null || seconds === undefined) return 'unknown';
+            const s = Number(seconds);
+            if (isNaN(s)) return 'unknown';
+            if (s < 60) return `${s}s ago`;
+            if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+            if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+            return `${Math.floor(s / 86400)}d ago`;
+        }
+
+        function _obsColor(condition) {
+            // condition: 'good' | 'warn' | 'bad' | 'neutral'
+            if (condition === 'good') return '#3ecf8e';
+            if (condition === 'warn') return '#f59f00';
+            if (condition === 'bad') return '#f85149';
+            return '#93a4b7';
+        }
+
+        function _obsFmt(val, decimals) {
+            const n = Number(val);
+            if (isNaN(n)) return '-';
+            return n.toFixed(decimals === undefined ? 2 : decimals);
+        }
+
+        function renderLiveTrades(data) {
+            const el = document.getElementById('liveTrades');
+            const tsEl = document.getElementById('liveTradesTs');
+            if (!el) return;
+            const trades = (data && data.trades) || [];
+            if (!trades.length) {
+                el.innerHTML = '<span style="color:#5a7a99;">No trades recorded yet.</span>';
+                return;
+            }
+            const rows = trades.map(t => {
+                const ago = _obsAgo(t.timestamp);
+                const action = (t.action || '').toUpperCase();
+                const color = action === 'BUY' ? '#3ecf8e' : action === 'SELL' ? '#f85149' : '#93a4b7';
+                const path = t.entry_path && t.entry_path !== 'unknown' ? ` <span style="color:#5a7a99;font-size:0.8em;">[${t.entry_path}]</span>` : '';
+                const price = t.price ? ` @ $${_obsFmt(t.price)}` : '';
+                const qty = t.qty ? ` ${_obsFmt(t.qty, 0)} shares` : '';
+                return `<div><span style="color:${color};font-weight:600;">${action}</span> <strong>${t.symbol || '-'}</strong>${qty}${price}${path} <span style="color:#5a7a99;">${ago}</span></div>`;
+            });
+            el.innerHTML = rows.join('');
+            if (tsEl) tsEl.textContent = `Showing last ${trades.length} trade(s)`;
+        }
+
+        function renderOpenPositions(data) {
+            const el = document.getElementById('openPositions');
+            const tsEl = document.getElementById('openPositionsTs');
+            if (!el) return;
+            const positions = (data && data.positions) || [];
+            if (!positions.length) {
+                el.innerHTML = '<span style="color:#5a7a99;">No open positions.</span>';
+                if (tsEl) tsEl.textContent = 'Source: ' + (data && data.source || 'unknown');
+                return;
+            }
+            const rows = positions.map(p => {
+                const pl = p.unrealized_pl;
+                const plpct = p.unrealized_plpc;
+                let plHtml = '';
+                if (pl !== null && pl !== undefined) {
+                    const sign = Number(pl) >= 0 ? '+' : '';
+                    const color = Number(pl) >= 0 ? '#3ecf8e' : '#f85149';
+                    const pctStr = plpct !== null && plpct !== undefined ? ` (${sign}${_obsFmt(Number(plpct) * 100, 1)}%)` : '';
+                    plHtml = ` → <span style="color:${color};font-weight:600;">${sign}$${_obsFmt(Math.abs(Number(pl)))}${pctStr}</span>`;
+                }
+                const qty = p.qty ? `${_obsFmt(Number(p.qty), 0)} shares` : '-';
+                const entry = p.entry_price ? `entry $${_obsFmt(p.entry_price)}` : '';
+                const current = p.current_price ? ` · now $${_obsFmt(p.current_price)}` : '';
+                return `<div><strong>${p.symbol || '-'}</strong>: ${qty}${entry ? ', ' + entry : ''}${current}${plHtml}</div>`;
+            });
+            el.innerHTML = rows.join('');
+            if (tsEl) tsEl.textContent = `${positions.length} position(s) · source: ${data.source || 'unknown'}`;
+        }
+
+        function renderLastSignals(data) {
+            const el = document.getElementById('lastSignals');
+            const tsEl = document.getElementById('lastSignalsTs');
+            if (!el) return;
+            const signals = (data && data.signals) || [];
+            if (!signals.length) {
+                el.innerHTML = '<span style="color:#5a7a99;">No signal data yet — waiting for bot cycle.</span>';
+                return;
+            }
+            // Group: BUY, HOLD, SKIP/REJECT
+            const buys = signals.filter(s => (s.entry_path || '').toLowerCase().includes('buy') || (s.reason || '').toLowerCase().includes('buy'));
+            const holds = signals.filter(s => (s.reason || '').toLowerCase().includes('hold') || (s.reason || '').toLowerCase().includes('no_signal') || (s.reason || '').toLowerCase().includes('no signal'));
+            const others = signals.filter(s => !buys.includes(s) && !holds.includes(s));
+            const renderGroup = (arr, color) => arr.map(s => {
+                const pct = s.predicted_change_pct ? ` · model: ${Number(s.predicted_change_pct) >= 0 ? '+' : ''}${_obsFmt(s.predicted_change_pct, 2)}%` : '';
+                const path = s.entry_path && s.entry_path !== 'unknown' ? ` [${s.entry_path}]` : '';
+                const reason = s.reason && s.reason !== 'unknown' ? ` — ${s.reason}` : '';
+                return `<div><span style="color:${color};font-weight:600;">${s.symbol || '-'}</span>${path}${pct}${reason}</div>`;
+            }).join('');
+            let html = '';
+            if (buys.length) html += `<div style="margin-bottom:6px;"><span style="color:#5a7a99;font-size:0.8em;">BUYING</span>${renderGroup(buys, '#3ecf8e')}</div>`;
+            if (holds.length) html += `<div style="margin-bottom:6px;"><span style="color:#5a7a99;font-size:0.8em;">HOLDING / NO ACTION</span>${renderGroup(holds, '#93a4b7')}</div>`;
+            if (others.length) html += `<div><span style="color:#5a7a99;font-size:0.8em;">SKIPPED / REJECTED</span>${renderGroup(others, '#f59f00')}</div>`;
+            el.innerHTML = html || '<span style="color:#5a7a99;">No signals.</span>';
+            if (tsEl) {
+                const latestTs = signals.map(s => s.timestamp).filter(Boolean).sort().pop();
+                tsEl.textContent = latestTs ? `Last evaluated ${_obsAgo(latestTs)} · ${signals.length} symbol(s)` : `${signals.length} symbol(s)`;
+            }
+        }
+
+        function renderDataHealth(data) {
+            const el = document.getElementById('dataHealth');
+            const tsEl = document.getElementById('dataHealthTs');
+            if (!el) return;
+            const sources = (data && data.sources) || {};
+            if (!Object.keys(sources).length) {
+                el.innerHTML = '<span style="color:#5a7a99;">No health data yet.</span>';
+                return;
+            }
+            const rows = Object.entries(sources).map(([name, info]) => {
+                const status = (info.status || 'unknown').toLowerCase();
+                const color = status === 'healthy' ? '#3ecf8e' : (status === 'stale' ? '#f59f00' : '#f85149');
+                const label = status === 'healthy' ? 'Fresh' : (status === 'stale' ? 'Stale' : 'Unknown');
+                const ageStr = info.age_seconds !== undefined && info.age_seconds !== null ? ` (${_obsSecsAgo(info.age_seconds)})` : '';
+                const confStr = info.confidence !== undefined ? ` · confidence ${_obsFmt(Number(info.confidence) * 100, 0)}%` : '';
+                const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                return `<div><strong>${displayName}</strong>: <span style="color:${color};">${label}</span>${ageStr}${confStr}</div>`;
+            });
+            el.innerHTML = rows.join('');
+            if (tsEl && data.timestamp) tsEl.textContent = `Checked ${_obsAgo(data.timestamp)}`;
+        }
+
+        function renderBotHeartbeat(data) {
+            const el = document.getElementById('botHeartbeat');
+            const tsEl = document.getElementById('botHeartbeatTs');
+            if (!el) return;
+            const bots = (data && data.bots) || {};
+            if (!Object.keys(bots).length) {
+                el.innerHTML = '<span style="color:#5a7a99;">No heartbeat data yet.</span>';
+                return;
+            }
+            const rows = Object.entries(bots).map(([name, info]) => {
+                const status = (info.status || 'unknown').toLowerCase();
+                const color = status === 'running' ? '#3ecf8e' : (status === 'stale' ? '#f59f00' : '#f85149');
+                const label = status === 'running' ? 'Running' : (status === 'stale' ? 'Silent' : status === 'stopped' ? 'Stopped' : 'Unknown');
+                const ageStr = info.last_output_age_seconds !== null && info.last_output_age_seconds !== undefined
+                    ? ` · last activity ${_obsSecsAgo(info.last_output_age_seconds)}` : '';
+                const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                return `<div><strong>${displayName}</strong>: <span style="color:${color};font-weight:600;">${label}</span>${ageStr}</div>`;
+            });
+            el.innerHTML = rows.join('');
+            if (tsEl && data.timestamp) tsEl.textContent = `Checked ${_obsAgo(data.timestamp)}`;
+        }
+
+        async function refreshObservability() {
+            try {
+                const [trades, positions, signals, health, heartbeat] = await Promise.all([
+                    fetch('/bot_live_trades').then(r => r.json()).catch(() => null),
+                    fetch('/bot_open_positions').then(r => r.json()).catch(() => null),
+                    fetch('/bot_last_signals').then(r => r.json()).catch(() => null),
+                    fetch('/bot_data_health').then(r => r.json()).catch(() => null),
+                    fetch('/bot_heartbeat').then(r => r.json()).catch(() => null),
+                ]);
+                if (trades) renderLiveTrades(trades);
+                if (positions) renderOpenPositions(positions);
+                if (signals) renderLastSignals(signals);
+                if (health) renderDataHealth(health);
+                if (heartbeat) renderBotHeartbeat(heartbeat);
+            } catch (e) {
+                console.warn('Observability refresh error:', e);
+            }
+        }
+
+        // ── END OBSERVABILITY HELPERS ──────────────────────────────────
+
+        async function refreshDashboard() {
+            try {
+                const res = await fetch('/bot_dashboard_data');
+                const data = await res.json();
+                renderDashboard(data);
+                runSystemHealthCheck(false);
+                refreshObservability();
+            } catch (e) {
+                document.getElementById('lastUpdated').textContent = 'Failed to load dashboard data';
+            }
+        }
+
+        async function sendCopilot() {
+            const input = document.getElementById('chatInput');
+            const message = (input.value || '').trim();
+            if (!message) return;
+            appendMsg('user', message);
+            input.value = '';
+
+            try {
+                const res = await fetch('/bot_copilot_chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot: activeTab, message })
+                });
+                const data = await res.json();
+                appendMsg('bot', data.answer || 'No response');
+            } catch (e) {
+                appendMsg('bot', `Error contacting copilot: ${e}`);
+            }
+        }
+
+        appendMsg('bot', 'Ask me what the trading, crypto, ASX, forex, or research bot has learned, what strategy each is using, and how returns can improve.');
+        onActionTypeChange();
+        setTab('trading_bot');
+        refreshDashboard();
+        runSystemHealthCheck(false);
+        setInterval(refreshDashboard, 15000);
+        renderCompoundingChart();
+    </script>
+</body>
+</html>

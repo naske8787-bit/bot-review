@@ -1,0 +1,33 @@
+{
+  "aggressive_cooldown_until": "",
+  "dynamic_offsets": {
+    "buy_threshold": 0.0,
+    "max_positions": 0.0,
+    "risk": 0.0
+  },
+  "last_drawdown_7d": 0.00021071528151153432,
+  "last_mode": "normal",
+  "last_realized_pnl_7d": 0,
+  "mode_stats": {
+    "aggressive": {
+      "losses": 0,
+      "pnl_sum": 200.0,
+      "wins": 2
+    },
+    "capital_preservation": {
+      "losses": 0,
+      "pnl_sum": 0.0,
+      "wins": 0
+    },
+    "cautious": {
+      "losses": 0,
+      "pnl_sum": 0.0,
+      "wins": 0
+    },
+    "normal": {
+      "losses": 1,
+      "pnl_sum": 400.0,
+      "wins": 5
+    }
+  }
+}

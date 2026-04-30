@@ -1,0 +1,17 @@
+{
+  "cash": 38582207.50606656,
+  "positions": {
+    "EURUSD": {
+      "avg_entry_price": 1.1680878400802612,
+      "units": -6931254.0
+    },
+    "GBPUSD": {
+      "avg_entry_price": 1.3465620279312134,
+      "units": -20465986.0
+    },
+    "USDCAD": {
+      "avg_entry_price": 1.3707000017166138,
+      "units": -2060391.0
+    }
+  }
+}

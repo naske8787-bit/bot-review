@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Motor / Sensor Gantt Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --card2: #1a2235;
+      --border: #243244;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent2: #6366f1;
+      --track: #1e293b;
+      --line: #2d3f55;
+      --red: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(ellipse at 20% 0%, #1e293b 0%, var(--bg) 60%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* ── Header ── */
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+    header h1 { font-size: 1.4rem; font-weight: 700; }
+    header .badge {
+      font-size: 0.72rem; padding: 3px 9px; border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; font-weight: 600; letter-spacing: .04em;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3);
+    }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: #93c5fd; }
+
+    /* ── Drop zone ── */
+    #dropzone {
+      border: 2px dashed var(--accent);
+      border-radius: 12px;
+      padding: 38px 20px;
+      text-align: center;
+      transition: background .2s, border-color .2s;
+      user-select: none;
+    }
+    #dropzone.over { background: rgba(59,130,246,.12); border-color: #60a5fa; border-style: solid; }
+    #dropzone .icon { font-size: 2.8rem; margin-bottom: 8px; pointer-events: none; }
+    #dropzone p { color: var(--muted); font-size: .93rem; pointer-events: none; }
+    #dropzone strong { color: var(--accent); }
+    #browse-btn {
+      display: inline-block; margin-top: 14px;
+      padding: 9px 24px; border-radius: 9px; font-size: .9rem; font-weight: 600;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; cursor: pointer; border: none;
+    }
+    #browse-btn:hover { opacity: .85; }
+    #fileInput { display: none; }
+    #filename { margin-top: 12px; font-size: .88rem; color: #6ee7b7; min-height: 1.4em; font-weight: 600; }
+
+    /* ── Config grid ── */
+    .cfg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px 16px;
+    }
+    .cfg-group label { display: block; font-size: .78rem; color: var(--muted); margin-bottom: 5px; }
+    .cfg-group select, .cfg-group input[type=text], .cfg-group input[type=number] {
+      width: 100%;
+      background: var(--track);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: .88rem;
+    }
+    .cfg-group select:focus, .cfg-group input:focus { outline: 2px solid var(--accent); }
+
+    .mode-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .mode-tab {
+      padding: 6px 16px; border-radius: 999px; cursor: pointer; font-size: .85rem;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      transition: all .15s;
+    }
+    .mode-tab.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border-color: transparent;
+    }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── Time range inputs ── */
+    .time-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; }
+    .time-row .cfg-group { flex: 1; min-width: 180px; }
+    .time-row input[type=datetime-local] {
+      width: 100%; background: var(--track); border: 1px solid var(--line);
+      border-radius: 8px; color: var(--text); padding: 7px 10px; font-size: .88rem;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 22px; border-radius: 9px; font-size: .9rem; font-weight: 600;
+      cursor: pointer; border: none; transition: opacity .15s, transform .1s;
+    }
+    .btn:hover { opacity: .88; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .btn-secondary { background: var(--card2); color: var(--text); border: 1px solid var(--border); }
+
+    #buildBtn { margin-top: 18px; }
+
+    /* ── Error / info banners ── */
+    .banner {
+      border-radius: 9px; padding: 10px 14px; font-size: .88rem; margin-bottom: 14px; display: none;
+    }
+    .banner.error { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); color: #fca5a5; display: block; }
+    .banner.info  { background: rgba(59,130,246,.1);  border: 1px solid rgba(59,130,246,.3); color: #93c5fd; display: block; }
+
+    /* ── Gantt ── */
+    #gantt-wrap { overflow-x: auto; }
+    .gantt-header {
+      display: flex; margin-bottom: 6px; margin-left: 180px;
+      position: relative; height: 32px; border-bottom: 1px solid var(--line);
+    }
+    .tick-label {
+      position: absolute; font-size: 10px; color: var(--muted);
+      transform: translateX(-50%); top: 0; white-space: nowrap;
+    }
+    .tick-vline {
+      position: absolute; top: 0; bottom: 0; width: 1px;
+      background: var(--line); top: 32px;
+    }
+    .gantt-rows { position: relative; }
+    .g-row {
+      display: grid; grid-template-columns: 170px 1fr;
+      gap: 8px; align-items: center; min-height: 40px; margin-bottom: 6px;
+    }
+    .g-label {
+      text-align: right; font-size: .82rem; font-weight: 600; color: #cbd5e1;
+      padding-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .g-track {
+      position: relative; height: 24px; background: var(--track);
+      border-radius: 999px; overflow: visible; border: 1px solid var(--line);
+    }
+    .g-bar {
+      position: absolute; top: 0; bottom: 0; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18); cursor: default;
+      transition: filter .15s;
+    }
+    .g-bar:hover { filter: brightness(1.2); z-index: 10; }
+
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed; z-index: 9999; pointer-events: none;
+      background: #1e293b; border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 13px; font-size: .82rem;
+      box-shadow: 0 6px 24px rgba(0,0,0,.5); max-width: 280px;
+      display: none;
+    }
+    #tooltip strong { color: #93c5fd; }
+    #tooltip table { border-collapse: collapse; margin-top: 5px; }
+    #tooltip td { padding: 1px 5px; color: var(--muted); }
+    #tooltip td:first-child { color: var(--text); }
+
+    /* ── Stats row ── */
+    .stats-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .stat-pill {
+      background: var(--card2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 14px; font-size: .82rem;
+    }
+    .stat-pill span { color: var(--muted); margin-right: 5px; }
+    .stat-pill strong { color: #6ee7b7; }
+
+    /* ── Export ── */
+    #export-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+    /* ── Legend ── */
+    #legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    .leg-item { display: flex; align-items: center; gap: 6px; font-size: .8rem; }
+    .leg-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .g-row { grid-template-columns: 100px 1fr; }
+      .gantt-header { margin-left: 110px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+
+<header>
+  <h1>Gantt Dashboard</h1>
+  <div class="badge">CSV → Chart</div>
+</header>
+
+<!-- ① Drop CSV -->
+<div class="card">
+  <h2>① Drop your CSV</h2>
+  <input type="file" id="fileInput" accept=".csv,.txt,.tsv" />
+  <div id="dropzone">
+    <div class="icon">📂</div>
+    <p><strong>Drag &amp; drop</strong> your CSV file here</p>
+    <p style="margin-top:6px; font-size:.8rem;">Supports Grafana exports, PLC/SCADA time-series, or start/end interval CSVs</p>
+    <button id="browse-btn" type="button">Browse file…</button>
+  </div>
+  <div id="filename"></div>
+</div>
+
+<!-- ② Configure -->
+<div class="card" id="cfg-card" style="display:none">
+  <h2>② Configure columns</h2>
+  <div id="banner" class="banner"></div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="timeseries">Time-series (sensor values → detect run intervals)</button>
+    <button class="mode-tab" data-mode="intervals">Start/End intervals (explicit start &amp; end columns)</button>
+  </div>
+
+  <!-- Time-series mode -->
+  <div class="section active" id="sec-timeseries">
+    <p style="color:var(--muted); font-size:.85rem; margin-bottom:12px;">
+      Select the timestamp column and one or more value columns.
+      Rows where the value exceeds the threshold are treated as "running".
+    </p>
+    <div class="cfg-grid">
+      <div class="cfg-group">
+        <label>Timestamp column</label>
+        <select id="ts-time-col"></select>
+      </div>
+      <div class="cfg-group">
+        <label>Value column(s) — one per "motor/sensor row"</label>
+        <select id="ts-value-cols" multiple size="5" style="height:auto"></select>
+      </div>
+      <div class="cfg-group">
+        <label>Running threshold (value &gt; X = ON)</label>
+        <input type="number" id="ts-threshold" value="0" step="any" />
+      </div>
+      <div class="cfg-group">
+        <label>Min run duration to show (seconds)</label>
+        <input type="number" id="ts-min-dur" value="0" step="1" min="0" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Intervals mode -->
+  <div class="section" id="sec-intervals">
+    <p style="color:var(--muted); font-size:.85rem; margin-bottom:12px;">
+      CSV already has one row per run interval with start and end columns.
+    </p>
+    <div class="cfg-grid">
+      <div class="cfg-group">
+        <label>Motor / Label column</label>
+        <select id="iv-motor-col"></select>
+      </div>
+      <div class="cfg-group">
+        <label>Start time column</label>
+        <select id="iv-start-col"></select>
+      </div>
+      <div class="cfg-group">
+        <label>End time column</label>
+        <select id="iv-end-col"></select>
+      </div>
+      <div class="cfg-group">
+        <label>Status / colour column (optional)</label>
+        <select id="iv-status-col"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared time window -->
+  <div class="time-row">
+    <div class="cfg-group">
+      <label>Window start (leave blank = auto)</label>
+      <input type="datetime-local" id="win-start" />
+    </div>
+    <div class="cfg-group">
+      <label>Window end (leave blank = auto)</label>
+      <input type="datetime-local" id="win-end" />
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="buildBtn">▶ Build Gantt</button>
+</div>
+
+<!-- ③ Chart output -->
+<div class="card" id="chart-card" style="display:none">
+  <h2>③ Gantt Chart</h2>
+  <div class="stats-row" id="stats-row"></div>
+  <div id="legend"></div>
+  <div id="banner2" class="banner"></div>
+  <div id="gantt-wrap">
+    <div class="gantt-header" id="gantt-header"></div>
+    <div class="gantt-rows" id="gantt-rows"></div>
+  </div>
+  <div id="export-row">
+    <button class="btn btn-secondary" id="exportHtmlBtn">⬇ Save as HTML</button>
+    <button class="btn btn-secondary" id="exportCsvBtn">⬇ Export intervals CSV</button>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────────────────────────
+// Utility helpers
+// ────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function hslColor(key) {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) & 0xffffffff;
+  const hue = Math.abs(h) % 360;
+  return `hsl(${hue}, 65%, 50%)`;
+}
+
+function fmtDur(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), r = s % 60;
+  if (m < 60) return `${m}m ${r}s`;
+  return `${Math.floor(m/60)}h ${m%60}m`;
+}
+
+function fmtTs(d) {
+  return d.toLocaleString(undefined, { year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  // Try native parse (handles ISO, RFC2822, US)
+  let d = new Date(str);
+  if (!isNaN(d)) return d;
+  // Try DD/MM/YYYY HH:MM:SS
+  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s*(.*)$/);
+  if (m) {
+    d = new Date(`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}T${m[4]||'00:00:00'}`);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+function parseCSV(text) {
+  // Detect delimiter: comma, semicolon, or tab
+  const firstLine = text.split('\n')[0];
+  const delim = firstLine.includes('\t') ? '\t' : firstLine.includes(';') ? ';' : ',';
+
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  // Skip Grafana-style comment headers (lines starting with #)
+  let headerIdx = 0;
+  while (headerIdx < lines.length && lines[headerIdx].trim().startsWith('#')) headerIdx++;
+
+  const headers = parseRow(lines[headerIdx], delim);
+  const rows = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const vals = parseRow(line, delim);
+    const obj = {};
+    headers.forEach((h, j) => { obj[h] = vals[j] !== undefined ? vals[j] : ''; });
+    rows.push(obj);
+  }
+  return { headers, rows };
+}
+
+function parseRow(line, delim) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i <= line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') inQ = false;
+      else cur += c;
+    } else if (c === '"') {
+      inQ = true;
+    } else if (c === delim || i === line.length) {
+      result.push(cur.trim());
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  return result;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────────────────────────
+let csvData = null; // { headers, rows }
+let currentMode = 'timeseries';
+let lastIntervals = [];
+
+// ────────────────────────────────────────────────────────────────────
+// Drop / file load
+// ────────────────────────────────────────────────────────────────────
+const dropzone = $('dropzone');
+const fileInput = $('fileInput');
+
+// Browse button triggers hidden input
+$('browse-btn').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+// Drag and drop on the zone (no overlay input, so events fire cleanly)
+['dragenter','dragover'].forEach(evt => {
+  dropzone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); dropzone.classList.add('over'); });
+});
+['dragleave','dragend'].forEach(evt => {
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('over'); });
+});
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); e.stopPropagation();
+  dropzone.classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+  else showBanner('banner', 'error', 'No file detected in drop. Try the Browse button instead.');
+});
+
+function loadFile(file) {
+  $('filename').textContent = `📄 ${file.name}`;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      csvData = parseCSV(ev.target.result);
+      if (!csvData.rows.length) throw new Error('CSV loaded but contains no data rows.');
+      populateSelects(csvData.headers);
+      $('cfg-card').style.display = '';
+      $('chart-card').style.display = 'none';
+      hideBanner('banner');
+      $('cfg-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      showBanner('banner', 'info', `✓ Loaded ${csvData.rows.length} rows, ${csvData.headers.length} columns. Now configure below and click Build Gantt.`);
+    } catch (err) {
+      showBanner('banner', 'error', `Parse error: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function populateSelects(headers) {
+  const selects = {
+    'ts-time-col': null, 'ts-value-cols': null,
+    'iv-motor-col': null, 'iv-start-col': null, 'iv-end-col': null, 'iv-status-col': null
+  };
+  Object.keys(selects).forEach(id => {
+    const el = $(id);
+    el.innerHTML = '';
+    if (id === 'iv-status-col') {
+      const opt = document.createElement('option');
+      opt.value = ''; opt.textContent = '— none —';
+      el.appendChild(opt);
+    }
+    headers.forEach(h => {
+      const opt = document.createElement('option');
+      opt.value = h; opt.textContent = h;
+      el.appendChild(opt);
+    });
+  });
+
+  // Auto-select sensible defaults
+  const lower = headers.map(h => h.toLowerCase());
+  const timeIdx = lower.findIndex(h => /time|timestamp|date|ts\b/.test(h));
+  if (timeIdx >= 0) $('ts-time-col').selectedIndex = timeIdx;
+
+  // Select all non-time columns as value columns
+  const tsVals = $('ts-value-cols');
+  Array.from(tsVals.options).forEach((opt, i) => { opt.selected = i !== timeIdx; });
+
+  // Intervals defaults
+  const motorIdx = lower.findIndex(h => /motor|machine|device|sensor|name|id/.test(h));
+  const startIdx = lower.findIndex(h => /start/.test(h));
+  const endIdx   = lower.findIndex(h => /end|stop|finish/.test(h));
+  if (motorIdx >= 0) $('iv-motor-col').selectedIndex = motorIdx;
+  if (startIdx >= 0) $('iv-start-col').selectedIndex = startIdx;
+  if (endIdx >= 0)   $('iv-end-col').selectedIndex   = endIdx;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Mode tabs
+// ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.mode-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    $('sec-' + currentMode).classList.add('active');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────
+// Build Gantt
+// ────────────────────────────────────────────────────────────────────
+$('buildBtn').addEventListener('click', () => {
+  hideBanner('banner');
+  try {
+    let intervals = currentMode === 'timeseries'
+      ? buildFromTimeseries() : buildFromIntervals();
+
+    if (!intervals.length) {
+      showBanner('banner', 'error', 'No intervals found. Try lowering the threshold or checking your column selection.');
+      return;
+    }
+
+    // Apply time window filter
+    let wStart = $('win-start').value ? new Date($('win-start').value) : null;
+    let wEnd   = $('win-end').value   ? new Date($('win-end').value)   : null;
+
+    if (!wStart) wStart = new Date(Math.min(...intervals.map(i => i.start)));
+    if (!wEnd)   wEnd   = new Date(Math.max(...intervals.map(i => i.end)));
+
+    intervals = intervals.filter(i => i.end > wStart && i.start < wEnd).map(i => ({
+      ...i,
+      start: i.start < wStart ? wStart : i.start,
+      end:   i.end   > wEnd   ? wEnd   : i.end
+    })).filter(i => i.end > i.start);
+
+    if (!intervals.length) {
+      showBanner('banner', 'error', 'No intervals within the selected time window.');
+      return;
+    }
+
+    lastIntervals = intervals;
+    renderGantt(intervals, wStart, wEnd);
+    $('chart-card').style.display = '';
+    $('chart-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    showBanner('banner', 'error', err.message);
+  }
+});
+
+// ── Time-series → intervals ──────────────────────────────────────────
+function buildFromTimeseries() {
+  const timeCol  = $('ts-time-col').value;
+  const threshold = parseFloat($('ts-threshold').value) || 0;
+  const minDurMs  = (parseFloat($('ts-min-dur').value) || 0) * 1000;
+
+  const selectedVals = Array.from($('ts-value-cols').selectedOptions).map(o => o.value);
+  if (!selectedVals.length) throw new Error('Select at least one value column.');
+  if (!timeCol) throw new Error('Select a timestamp column.');
+
+  const intervals = [];
+
+  selectedVals.forEach(col => {
+    let runStart = null;
+    let lastTime = null;
+
+    const finishRun = end => {
+      if (runStart && end > runStart && (end - runStart) >= minDurMs) {
+        intervals.push({ motor: col, start: runStart, end, status: 'RUNNING', value: null });
+      }
+      runStart = null;
+    };
+
+    csvData.rows.forEach(row => {
+      const ts = parseDate(row[timeCol]);
+      const val = parseFloat(row[col]);
+      if (!ts || isNaN(val)) return;
+
+      const isOn = val > threshold;
+      if (isOn && !runStart) {
+        runStart = ts;
+      } else if (!isOn && runStart) {
+        finishRun(ts);
+      }
+      lastTime = ts;
+    });
+
+    if (runStart && lastTime && lastTime > runStart) finishRun(lastTime);
+  });
+
+  return intervals;
+}
+
+// ── Explicit intervals ───────────────────────────────────────────────
+function buildFromIntervals() {
+  const motorCol  = $('iv-motor-col').value;
+  const startCol  = $('iv-start-col').value;
+  const endCol    = $('iv-end-col').value;
+  const statusCol = $('iv-status-col').value;
+
+  if (!motorCol || !startCol || !endCol)
+    throw new Error('Motor, start, and end columns are required.');
+
+  const intervals = [];
+  csvData.rows.forEach(row => {
+    const motor  = (row[motorCol] || '').trim();
+    const start  = parseDate(row[startCol]);
+    const end    = parseDate(row[endCol]);
+    const status = statusCol ? (row[statusCol] || 'RUNNING').trim() : 'RUNNING';
+    if (!motor || !start || !end || end <= start) return;
+    intervals.push({ motor, start, end, status });
+  });
+  return intervals;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Render
+// ────────────────────────────────────────────────────────────────────
+function renderGantt(intervals, wStart, wEnd) {
+  const totalMs = wEnd - wStart;
+
+  // Group
+  const grouped = {};
+  intervals.forEach(i => {
+    if (!grouped[i.motor]) grouped[i.motor] = [];
+    grouped[i.motor].push(i);
+  });
+  const motors = Object.keys(grouped).sort();
+
+  // Unique status keys for legend
+  const statusKeys = [...new Set(intervals.map(i => i.status))];
+
+  // ── Stats ──
+  const totalRunMs = intervals.reduce((s, i) => s + (i.end - i.start), 0);
+  $('stats-row').innerHTML = `
+    <div class="stat-pill"><span>Motors/Sensors:</span><strong>${motors.length}</strong></div>
+    <div class="stat-pill"><span>Intervals:</span><strong>${intervals.length}</strong></div>
+    <div class="stat-pill"><span>Window:</span><strong>${fmtDur(totalMs)}</strong></div>
+    <div class="stat-pill"><span>Total run time:</span><strong>${fmtDur(totalRunMs)}</strong></div>
+    <div class="stat-pill"><span>From:</span><strong>${fmtTs(wStart)}</strong></div>
+    <div class="stat-pill"><span>To:</span><strong>${fmtTs(wEnd)}</strong></div>
+  `;
+
+  // ── Legend ──
+  $('legend').innerHTML = statusKeys.map(s =>
+    `<div class="leg-item"><div class="leg-dot" style="background:${hslColor(s)}"></div>${s}</div>`
+  ).join('');
+
+  // ── Tick marks ──
+  const headerEl = $('gantt-header');
+  const rowsEl   = $('gantt-rows');
+  headerEl.innerHTML = '';
+  rowsEl.innerHTML   = '';
+
+  const hours = totalMs / 3600000;
+  let stepMs;
+  if      (hours <= 1)   stepMs = 5   * 60000;
+  else if (hours <= 6)   stepMs = 30  * 60000;
+  else if (hours <= 24)  stepMs = 60  * 60000;
+  else if (hours <= 72)  stepMs = 3   * 3600000;
+  else if (hours <= 168) stepMs = 6   * 3600000;
+  else                   stepMs = 24  * 3600000;
+
+  const startFloored = new Date(Math.ceil(wStart.getTime() / stepMs) * stepMs);
+  for (let t = startFloored.getTime(); t <= wEnd.getTime(); t += stepMs) {
+    const pct = ((t - wStart) / totalMs) * 100;
+    const label = document.createElement('div');
+    label.className = 'tick-label';
+    label.style.left = pct + '%';
+    label.textContent = new Date(t).toLocaleString(undefined, {
+      month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'
+    });
+    headerEl.appendChild(label);
+
+    // Vertical guide lines over rows area
+    const vline = document.createElement('div');
+    vline.className = 'tick-vline';
+    vline.style.left = `calc(170px + ${pct}% * (100% - 170px) / 100)`;
+    // We'll handle vlines differently — overlay on the track area
+  }
+
+  // ── Rows ──
+  motors.forEach(motor => {
+    const row = document.createElement('div');
+    row.className = 'g-row';
+
+    const label = document.createElement('div');
+    label.className = 'g-label';
+    label.textContent = motor;
+    label.title = motor;
+
+    const track = document.createElement('div');
+    track.className = 'g-track';
+
+    // tick vlines inside track
+    for (let t = startFloored.getTime(); t <= wEnd.getTime(); t += stepMs) {
+      const pct = ((t - wStart) / totalMs) * 100;
+      const vl = document.createElement('div');
+      vl.style.cssText = `position:absolute;left:${pct}%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.07);pointer-events:none;`;
+      track.appendChild(vl);
+    }
+
+    grouped[motor].forEach(item => {
+      const left  = ((item.start - wStart) / totalMs) * 100;
+      const width = ((item.end   - item.start) / totalMs) * 100;
+      const bar = document.createElement('div');
+      bar.className = 'g-bar';
+      bar.style.left  = left  + '%';
+      bar.style.width = Math.max(width, 0.15) + '%';
+      bar.style.background = hslColor(item.status);
+
+      bar.addEventListener('mousemove', e => showTooltip(e, motor, item));
+      bar.addEventListener('mouseleave', hideTooltip);
+      track.appendChild(bar);
+    });
+
+    row.appendChild(label);
+    row.appendChild(track);
+    rowsEl.appendChild(row);
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Tooltip
+// ────────────────────────────────────────────────────────────────────
+const tooltip = $('tooltip');
+function showTooltip(e, motor, item) {
+  const dur = item.end - item.start;
+  tooltip.innerHTML = `
+    <strong>${motor}</strong>
+    <table>
+      <tr><td>Status:</td><td>${item.status}</td></tr>
+      <tr><td>Start:</td><td>${fmtTs(item.start)}</td></tr>
+      <tr><td>End:</td><td>${fmtTs(item.end)}</td></tr>
+      <tr><td>Duration:</td><td>${fmtDur(dur)}</td></tr>
+    </table>`;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+  // Prevent overflow right
+  const r = tooltip.getBoundingClientRect();
+  if (r.right > window.innerWidth - 8) tooltip.style.left = (e.clientX - r.width - 14) + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+document.addEventListener('mousemove', e => { if (tooltip.style.display !== 'none') moveTooltip(e); });
+
+// ────────────────────────────────────────────────────────────────────
+// Export
+// ────────────────────────────────────────────────────────────────────
+$('exportHtmlBtn').addEventListener('click', () => {
+  const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html' });
+  triggerDownload(blob, 'gantt_chart.html');
+});
+
+$('exportCsvBtn').addEventListener('click', () => {
+  const header = 'motor,start_time,end_time,status,duration_seconds\n';
+  const rows = lastIntervals.map(i =>
+    `${q(i.motor)},${i.start.toISOString()},${i.end.toISOString()},${q(i.status)},${Math.round((i.end-i.start)/1000)}`
+  ).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  triggerDownload(blob, 'gantt_intervals.csv');
+});
+
+function q(v) { return `"${String(v).replace(/"/g,'""')}"`; }
+function triggerDownload(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Banner helpers
+// ────────────────────────────────────────────────────────────────────
+function showBanner(id, type, msg) {
+  const el = $(id);
+  el.className = `banner ${type}`;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideBanner(id) {
+  const el = $(id);
+  el.className = 'banner';
+  el.style.display = 'none';
+}
+</script>
+</body>
+</html>

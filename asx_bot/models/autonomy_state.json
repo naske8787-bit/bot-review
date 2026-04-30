@@ -1,0 +1,28 @@
+{
+  "aggressive_cooldown_until": "",
+  "last_drawdown_7d": 0.0,
+  "last_mode": "normal",
+  "last_realized_pnl_7d": 0,
+  "mode_stats": {
+    "aggressive": {
+      "losses": 0,
+      "pnl_sum": 200.0,
+      "wins": 2
+    },
+    "capital_preservation": {
+      "losses": 0,
+      "pnl_sum": 0.0,
+      "wins": 0
+    },
+    "cautious": {
+      "losses": 0,
+      "pnl_sum": 0.0,
+      "wins": 0
+    },
+    "normal": {
+      "losses": 1,
+      "pnl_sum": 400.0,
+      "wins": 5
+    }
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Auto-start trading bot",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "if command -v tmux >/dev/null 2>&1 && tmux has-session -t trading_bot 2>/dev/null; then echo \"Trading bot already running in tmux.\"; else PYTHON_BIN=/home/codespace/.python/current/bin/python bash ./run_tmux.sh; fi"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/trading_bot"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Auto-start crypto bot",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "if command -v tmux >/dev/null 2>&1 && tmux has-session -t crypto_bot 2>/dev/null; then echo \"Crypto bot already running in tmux.\"; else PYTHON_BIN=/home/codespace/.python/current/bin/python bash ./run_tmux.sh; fi"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/crypto_bot"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Auto-start API server",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "if command -v tmux >/dev/null 2>&1 && tmux has-session -t api_server 2>/dev/null; then echo \"API server already running in tmux.\"; else tmux new-session -d -s api_server \"cd /workspaces/Capitol_Trades_API && bash supervise_api.sh\" && echo \"API server started on port 8000.\"; fi"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Auto-start mining dashboard",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "if command -v tmux >/dev/null 2>&1 && tmux has-session -t mining_dashboard 2>/dev/null; then echo \"Mining dashboard already running in tmux.\"; else tmux new-session -d -s mining_dashboard \"cd /workspaces/Capitol_Trades_API && bash supervise_dashboard.sh\" && echo \"Mining dashboard started on port 5051.\"; fi"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Auto-start ASX bot",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "if command -v tmux >/dev/null 2>&1 && tmux has-session -t asx_bot 2>/dev/null; then echo \"ASX bot already running in tmux.\"; else PYTHON_BIN=/home/codespace/.python/current/bin/python bash ./run_tmux.sh; fi"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/asx_bot"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Auto-start forex bot",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "if command -v tmux >/dev/null 2>&1 && tmux has-session -t forex_bot 2>/dev/null; then echo \"Forex bot already running in tmux.\"; else PYTHON_BIN=/home/codespace/.python/current/bin/python bash ./run_tmux.sh; fi"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/forex_bot"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Trading bot output",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "sleep 3 && tail -f /workspaces/Capitol_Trades_API/trading_bot/output.log"
+      ],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true,
+        "clear": true,
+        "group": "bots"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

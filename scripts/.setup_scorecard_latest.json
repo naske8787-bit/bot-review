@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-30T09:55:09.170053+00:00",
+  "generated_at": "2026-04-30T10:09:17.293226+00:00",
   "stocks": [
     {
       "symbol": "GOOGL",
@@ -221,9 +221,9 @@
       "avg_return": 0.0,
       "expectancy": 0.0,
       "score": -15.05,
-      "trend_strength_pct": -0.29,
-      "rsi": 49.88,
-      "momentum_pct": 0.51
+      "trend_strength_pct": -0.25,
+      "rsi": 50.09,
+      "momentum_pct": -0.01
     },
     {
       "symbol": "ETH/USD",
@@ -235,9 +235,9 @@
       "avg_return": 0.0,
       "expectancy": 0.0,
       "score": -15.05,
-      "trend_strength_pct": -0.6,
-      "rsi": 48.47,
-      "momentum_pct": 0.72
+      "trend_strength_pct": -0.52,
+      "rsi": 48.93,
+      "momentum_pct": 0.21
     },
     {
       "symbol": "SOL/USD",
@@ -249,9 +249,9 @@
       "avg_return": 0.0,
       "expectancy": 0.0,
       "score": -15.05,
-      "trend_strength_pct": -0.38,
-      "rsi": 48.7,
-      "momentum_pct": 0.39
+      "trend_strength_pct": -0.36,
+      "rsi": 47.63,
+      "momentum_pct": -0.22
     }
   ],
   "top_stock_candidates": [

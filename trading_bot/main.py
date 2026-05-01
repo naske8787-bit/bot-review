@@ -2,7 +2,6 @@ import time
 import json
 import os
 import sys
-import urllib.error
 import urllib.request
 from collections import deque
 
@@ -37,7 +36,6 @@ from config import (
 )
 from performance_tracker import PerformanceTracker
 from strategy import TradingStrategy
-from strategy import _pipeline as _promotion_pipeline, _exec_tracker as _exec_quality_tracker
 from train import retrain_models
 from autonomy import AutonomousDecisionEngine
 from config import AUTONOMOUS_EXECUTION_ENABLED
@@ -49,27 +47,9 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT_DIR, "shared"))
 from scorecard_runtime import build_or_load_setup_scorecard, select_active_candidates, candidate_symbol_set
 from market_overlay import MarketOverlay
-from drift_detector import DriftDetector
-from confidence_pacer import ConfidenceCapitalPacer
-
-_DRIFT_STATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-_DRIFT_CALIB_REFRESH_SECONDS = int(os.getenv("DRIFT_CALIB_REFRESH_SECONDS", "900"))  # re-read trade log every 15 min
-_drift_calib_last_ts = 0.0
 
 
 _ALERT_LAST_SENT_TS = {}
-_PORTFOLIO_GUARDRAILS_URL = os.getenv("PORTFOLIO_GUARDRAILS_URL", "http://127.0.0.1:8000/portfolio_guardrails")
-_PORTFOLIO_GUARDRAILS_CACHE_TTL_SECONDS = int(os.getenv("PORTFOLIO_GUARDRAILS_CACHE_TTL_SECONDS", "90"))
-_PORTFOLIO_GUARDRAILS_LAST = {"ts": 0.0, "data": {}}
-
-
-def _pacing_regime(multiplier):
-    val = float(multiplier or 1.0)
-    if val <= 0.50:
-        return "defensive"
-    if val <= 0.85:
-        return "cautious"
-    return "normal"
 
 
 def _send_webhook_alert(payload):
@@ -135,30 +115,6 @@ def notify_alert(event_key, message, severity="warning", min_interval=None):
     sent = _send_telegram_alert(f"[trading_bot][{severity}] {message}") or sent
     if sent:
         _ALERT_LAST_SENT_TS[event_key] = now
-
-
-def _fetch_portfolio_guardrails():
-    now = time.time()
-    cached = _PORTFOLIO_GUARDRAILS_LAST.get("data") or {}
-    ttl_seconds = max(15, _PORTFOLIO_GUARDRAILS_CACHE_TTL_SECONDS)
-    last_ts = float(_PORTFOLIO_GUARDRAILS_LAST.get("ts", 0.0) or 0.0)
-    age = now - last_ts
-    if cached and age < ttl_seconds:
-        return cached
-
-    try:
-        req = urllib.request.Request(_PORTFOLIO_GUARDRAILS_URL, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-            if isinstance(payload, dict):
-                _PORTFOLIO_GUARDRAILS_LAST["ts"] = now
-                _PORTFOLIO_GUARDRAILS_LAST["data"] = payload
-                return payload
-    except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
-        # Use short-lived cache only; stale values should not keep bots paused.
-        if cached and age < ttl_seconds:
-            return cached
-    return {}
 
 
 def _rank_multipliers(rows):
@@ -280,10 +236,6 @@ def main():
         trade_log_path=tracker.trade_log_path,
         equity_log_path=tracker.equity_log_path,
     )
-    drift_detector = DriftDetector("trading", _DRIFT_STATE_DIR)
-    capital_pacer = ConfidenceCapitalPacer("trading", _DRIFT_STATE_DIR)
-    last_pacing_mult = float(capital_pacer.multiplier)
-    last_pacing_regime = _pacing_regime(last_pacing_mult)
 
     symbols = WATCHLIST + IBKR_WATCHLIST
     if IBKR_WATCHLIST:
@@ -296,7 +248,6 @@ def main():
     setup_expectancy_window = deque(maxlen=30)
     symbol_error_counts = {}
     wf_cautious_active = False
-    portfolio_guardrail_kill_switch = False
     market_overlay = None
     if MARKET_OVERLAY_ENABLED:
         market_overlay = MarketOverlay(
@@ -446,53 +397,6 @@ def main():
             for update in strategy.auto_apply_improvements():
                 print(f"Auto-improvement: {update}")
 
-            guardrails = _fetch_portfolio_guardrails() or {}
-            kill_switch_by_bot = guardrails.get("kill_switch_by_bot") or {}
-            bot_reasons = guardrails.get("bot_reasons") or {}
-            global_hard_stop_active = bool(guardrails.get("global_hard_stop_active", guardrails.get("kill_switch_active", False)))
-            global_hard_stop_reasons = guardrails.get("global_hard_stop_reasons") or guardrails.get("reasons") or []
-
-            if isinstance(kill_switch_by_bot, dict) and ("trading_bot" in kill_switch_by_bot):
-                guardrail_kill_switch = bool(kill_switch_by_bot.get("trading_bot", False))
-                reasons = bot_reasons.get("trading_bot") or []
-            else:
-                guardrail_kill_switch = bool(guardrails.get("kill_switch_active", False))
-                reasons = guardrails.get("reasons") or []
-
-            effective_kill_switch = bool(guardrail_kill_switch or global_hard_stop_active)
-            if effective_kill_switch:
-                portfolio_guardrail_kill_switch = True
-                merged_reasons = list(reasons)
-                if global_hard_stop_active:
-                    for r in global_hard_stop_reasons:
-                        if r not in merged_reasons:
-                            merged_reasons.append(r)
-                strategy.apply_autonomy_profile({
-                    "allow_new_entries": False,
-                    "risk_multiplier": 0.0,
-                    "mode": "capital_preservation",
-                })
-                print(
-                    "Trading guardrail kill-switch active: "
-                    + ("; ".join(str(r) for r in merged_reasons) or "risk thresholds breached")
-                )
-                if ALERT_KILL_SWITCH_ENABLED:
-                    notify_alert(
-                        "portfolio_guardrail_kill_switch",
-                        "Trading guardrail blocked new entries: "
-                        + ("; ".join(str(r) for r in merged_reasons) or "risk thresholds breached"),
-                        severity="critical",
-                        min_interval=300,
-                    )
-            elif portfolio_guardrail_kill_switch:
-                portfolio_guardrail_kill_switch = False
-                notify_alert(
-                    "portfolio_guardrail_recovered",
-                    "Trading guardrail recovered; autonomous entry gating can resume.",
-                    severity="info",
-                    min_interval=300,
-                )
-
         # Auto-retrain on schedule
         if AUTO_RETRAIN_ENABLED:
             retrain_interval_secs = AUTO_RETRAIN_INTERVAL_HOURS * 3600
@@ -567,16 +471,6 @@ def main():
                 if bool(analysis.get("setup_passed", False)):
                     setup_expectancy_window.append(float(analysis.get("setup_expectancy_pct", 0.0) or 0.0) / 100.0)
                 market_flag = "OK" if analysis.get("market_favorable", True) else "WEAK"
-
-                # Feed drift detector with signal features and regime label.
-                drift_detector.update_features({
-                    "predicted_change":  float(analysis.get("predicted_change_pct", 0.0) or 0.0) / 100.0,
-                    "trend_strength":    float(analysis.get("trend_strength_pct", 0.0) or 0.0) / 100.0,
-                    "recent_return":     float(analysis.get("recent_return_pct", 0.0) or 0.0) / 100.0,
-                    "news_score":        float(analysis.get("news_score", 0.0) or 0.0),
-                })
-                drift_detector.update_regime(str(analysis.get("market_regime", "unknown") or "unknown"))
-
                 print(
                     f"{symbol}: {signal} | "
                     f"predicted_change={analysis.get('predicted_change_pct', 0.0):.2f}% | "
@@ -643,79 +537,6 @@ def main():
                 print(
                     "Setup-decay de-risk active: rolling validated setup expectancy "
                     f"{rolling_expectancy * 100:.2f}% over {len(setup_expectancy_window)} observations."
-                )
-
-        # Drift detection: update calibration from trade log, apply de-risk multiplier.
-        global _drift_calib_last_ts
-        if now - _drift_calib_last_ts >= _DRIFT_CALIB_REFRESH_SECONDS:
-            drift_detector.update_calibration_from_log(tracker.trade_log_path)
-            _drift_calib_last_ts = now
-        drift_mult = drift_detector.get_risk_multiplier()
-        strategy.drift_risk_multiplier = drift_mult
-        drift_detector.save()
-        drift_state = drift_detector.get_state()
-
-        # Promotion pipeline: auto-advance canary→live or roll back canary→shadow.
-        _exec_metrics = _exec_quality_tracker.get_metrics()
-        _promo_events = _promotion_pipeline.evaluate_auto_advance(_exec_metrics)
-        for _ev in _promo_events:
-            print(f"Promotion pipeline [{_promotion_pipeline.stage}]: {_ev}")
-            if ALERT_KILL_SWITCH_ENABLED:
-                notify_alert("promotion_pipeline_event", f"trading_bot: {_ev}",
-                             severity="info", min_interval=300)
-
-        # Confidence pacing: reliability-driven capital deployment multiplier.
-        _pace_mult, _pace_reasons = capital_pacer.update(
-            exec_metrics=_exec_metrics,
-            drift_state=drift_state,
-            pipeline_stage=_promotion_pipeline.stage,
-        )
-        strategy.confidence_risk_multiplier = _pace_mult
-        capital_pacer.save()
-        if _pace_reasons:
-            print(
-                "Capital pacing active: "
-                f"mult={_pace_mult:.2f} reasons={_pace_reasons}"
-            )
-
-        current_pacing_regime = _pacing_regime(_pace_mult)
-        if current_pacing_regime != last_pacing_regime:
-            notify_alert(
-                "capital_pacing_regime_change",
-                (
-                    "Capital pacing regime changed "
-                    f"{last_pacing_regime} -> {current_pacing_regime} "
-                    f"(mult={_pace_mult:.2f}, reasons={_pace_reasons})"
-                ),
-                severity="warning" if current_pacing_regime in ("cautious", "defensive") else "info",
-                min_interval=300,
-            )
-        if abs(float(_pace_mult) - float(last_pacing_mult)) >= 0.15:
-            notify_alert(
-                "capital_pacing_step_change",
-                (
-                    "Capital pacing multiplier step-change "
-                    f"{float(last_pacing_mult):.2f} -> {float(_pace_mult):.2f} "
-                    f"(regime={current_pacing_regime})"
-                ),
-                severity="warning" if _pace_mult < last_pacing_mult else "info",
-                min_interval=300,
-            )
-        last_pacing_mult = float(_pace_mult)
-        last_pacing_regime = current_pacing_regime
-
-        if drift_state.get("drift_active"):
-            print(
-                f"Drift de-risk active: sizing multiplier={drift_mult:.2f} "
-                f"flags={drift_state.get('flags', [])}"
-            )
-            if ALERT_KILL_SWITCH_ENABLED:
-                notify_alert(
-                    "drift_derisk_active",
-                    f"Drift detected; sizing reduced to {drift_mult:.0%}. "
-                    f"Flags: {', '.join(drift_state.get('flags', []))}",
-                    severity="warning",
-                    min_interval=1800,
                 )
 
         cycle_snapshot = tracker.record_equity_snapshot(broker, note="hourly_cycle")

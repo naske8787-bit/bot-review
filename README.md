@@ -16,6 +16,14 @@ python run.py
 
 Then open `http://127.0.0.1:8000/health` or another route above.
 
+## Guardrail tests
+
+Run the shared decision and strategy wiring tests with one command:
+
+```bash
+bash scripts/run_guardrail_tests.sh
+```
+
 ## Operations (Hardened)
 
 Use the canonical service controller to avoid duplicate process owners:

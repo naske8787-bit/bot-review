@@ -38,7 +38,7 @@ from config import (
 )
 from performance_tracker import PerformanceTracker
 from strategy import TradingStrategy
-from strategy import _pipeline as _promotion_pipeline, _exec_tracker as _exec_quality_tracker
+from execution_service import execution_service, _pipeline as _promotion_pipeline, _exec_tracker as _exec_quality_tracker
 from train import retrain_models
 from autonomy import AutonomousDecisionEngine
 from config import AUTONOMOUS_EXECUTION_ENABLED
@@ -701,7 +701,7 @@ def main():
                     f"autonomy={strategy.autonomy_profile.get('mode','normal')}"
                 )
 
-                trade_result = strategy.execute_trade(signal, symbol, broker)
+                trade_result = execution_service.execute_trade(strategy, signal, symbol, broker)
                 if trade_result:
                     cash_balance = broker.get_account_balance()
                     tracker.record_trade(

@@ -1,12 +1,7 @@
 {
   "aggressive_cooldown_until": "",
-  "dynamic_offsets": {
-    "buy_threshold": 0.0,
-    "max_positions": 0.0,
-    "risk": 0.0
-  },
-  "last_drawdown_7d": 0.00021071528151153432,
-  "last_mode": "normal",
+  "last_drawdown_7d": 0.0,
+  "last_mode": "cautious",
   "last_realized_pnl_7d": 0,
   "mode_stats": {
     "aggressive": {

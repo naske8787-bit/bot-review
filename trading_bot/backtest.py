@@ -14,6 +14,7 @@ from config import (
 )
 from data_fetcher import fetch_stock_data, preprocess_data
 from model import load_trained_model, predict_price
+from signal_logic import decide_model_trend_action
 
 
 def _max_drawdown(values):
@@ -91,18 +92,22 @@ def backtest_strategy(symbol, start_date, end_date, initial_capital=10000.0):
         predicted_price = predict_price(model, scaler, recent_data)
         predicted_change = (predicted_price - current_price) / current_price
         trend_confirmation = bool(sma20.iloc[i] > sma50.iloc[i] and current_price > sma20.iloc[i])
-        positive_momentum = bool(momentum_5d.iloc[i] >= BUY_THRESHOLD_PCT)
 
         if shares > 0:
-            should_sell = (
-                current_price <= entry_price * (1 - STOP_LOSS_PCT)
-                or current_price >= entry_price * (1 + TAKE_PROFIT_PCT)
-                or (
-                    predicted_change <= -SELL_THRESHOLD_PCT
-                    and (not trend_confirmation or momentum_5d.iloc[i] < 0)
-                )
+            position_action = decide_model_trend_action(
+                {
+                    "has_position": True,
+                    "current_price": current_price,
+                    "entry_price": entry_price,
+                    "predicted_change": predicted_change,
+                    "trend_confirmation": trend_confirmation,
+                    "momentum": float(momentum_5d.iloc[i]),
+                    "sell_threshold": SELL_THRESHOLD_PCT,
+                    "stop_loss_pct": STOP_LOSS_PCT,
+                    "take_profit_pct": TAKE_PROFIT_PCT,
+                }
             )
-            if should_sell:
+            if position_action == "SELL":
                 fill_price = _estimate_fill_price("SELL", delayed_price, spread_bps, slippage_bps)
                 commission = _commission_for_shares(shares)
                 gross_proceeds = shares * fill_price
@@ -128,8 +133,16 @@ def backtest_strategy(symbol, start_date, end_date, initial_capital=10000.0):
                 shares = 0.0
                 entry_price = None
         else:
-            should_buy = predicted_change >= BUY_THRESHOLD_PCT and trend_confirmation and positive_momentum
-            if should_buy:
+            position_action = decide_model_trend_action(
+                {
+                    "has_position": False,
+                    "predicted_change": predicted_change,
+                    "trend_confirmation": trend_confirmation,
+                    "momentum": float(momentum_5d.iloc[i]),
+                    "buy_threshold": BUY_THRESHOLD_PCT,
+                }
+            )
+            if position_action == "BUY":
                 fill_price = _estimate_fill_price("BUY", delayed_price, spread_bps, slippage_bps)
                 if fill_price <= 0:
                     continue

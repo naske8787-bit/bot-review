@@ -1,0 +1,3 @@
+[2026-04-11T00:43:19Z] boot_start_bot.sh invoked
+[2026-04-11T00:43:19Z] waiting 0s for network/services
+[2026-04-11T00:43:19Z] tmux session 'trading_bot' already running; nothing to do

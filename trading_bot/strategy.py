@@ -61,13 +61,12 @@ from config import (
     GROWTH_MOMENTUM_MIN_TREND_MULTIPLIER,
     GROWTH_MOMENTUM_MIN_RETURN_MULTIPLIER,
 )
-from data_fetcher import fetch_capitol_trades, fetch_stock_data, preprocess_data, fetch_vix_level, fetch_news_sentiment, fetch_sector_momentum
-from data_fetcher import fetch_global_macro_sentiment
-from data_fetcher import fetch_external_research_sentiment
-from data_fetcher import get_capitol_data_health
+from data_fetcher import fetch_stock_data, preprocess_data
 from experience_policy import ExperiencePolicy
 from event_learner import EventImpactLearner
-from model import load_trained_model, predict_price
+from model import load_trained_model
+from signal_logic import decide_live_position_action, decide_model_trend_action
+from signal_context_provider import SignalContextProvider
 import sys as _sys
 import os as _os
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "shared"))
@@ -76,13 +75,6 @@ from setup_validator import evaluate_equity_setup
 from regime_detector import detect_equity_regime
 from fundamentals import evaluate_company_fundamentals
 from long_term_policy import LongTermPolicy
-from execution_quality import ExecutionQualityTracker as _ExecQualTracker
-from promotion_pipeline import PromotionPipeline as _PromotionPipeline
-
-_EXEC_LOG_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "logs", "execution_quality.jsonl")
-_exec_tracker = _ExecQualTracker(_EXEC_LOG_PATH)
-_PIPELINE_STATE_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "logs")
-_pipeline = _PromotionPipeline("trading", _PIPELINE_STATE_DIR)
 
 
 class TradingStrategy:
@@ -153,6 +145,7 @@ class TradingStrategy:
             max_symbol_exposure_pct=LONG_TERM_MAX_SYMBOL_EXPOSURE_PCT,
             max_drawdown_pct=LONG_TERM_MAX_PORTFOLIO_DRAWDOWN_PCT,
         )
+        self.signal_context_provider = SignalContextProvider()
 
     def apply_autonomy_profile(self, profile):
         if isinstance(profile, dict):
@@ -604,25 +597,22 @@ class TradingStrategy:
         symbol = symbol.upper()
         self._bootstrap_symbol_history_if_needed(symbol)
         try:
-            data = preprocess_data(fetch_stock_data(symbol, period="1y"))
-            if len(data) < 60:
-                self.last_analysis[symbol] = {"reason": "not_enough_data"}
+            context = self.signal_context_provider.build(symbol=symbol, get_model_bundle=self._get_model_bundle)
+            if not bool(context.get("ok")):
+                self.last_analysis[symbol] = {"reason": str(context.get("reason") or "context_unavailable")}
                 return "HOLD"
 
-            model, scaler = self._get_model_bundle(symbol)
-            close = data["Close"].astype(float)
-            recent_prices = close.tail(60).to_numpy()
-            predicted_price = predict_price(model, scaler, recent_prices)
-
-            current_price = float(close.iloc[-1])
-            predicted_change = (predicted_price - current_price) / current_price
-            short_trend = float(close.tail(min(20, len(close))).mean())
-            long_trend = float(close.tail(min(50, len(close))).mean())
-            recent_return = float(close.pct_change(5).fillna(0.0).iloc[-1])
-            trend_strength = (short_trend - long_trend) / max(abs(long_trend), 1e-9)
-
-            trades = fetch_capitol_trades()
-            data_health = get_capitol_data_health()
+            data = context["data"]
+            close = context["close"]
+            predicted_price = float(context["predicted_price"])
+            current_price = float(context["current_price"])
+            predicted_change = float(context["predicted_change"])
+            short_trend = float(context["short_trend"])
+            long_trend = float(context["long_trend"])
+            recent_return = float(context["recent_return"])
+            trend_strength = float(context["trend_strength"])
+            trades = context["trades"]
+            data_health = context["data_health"]
             sentiment, buy_signals, sell_signals = self._calculate_sentiment(trades, symbol)
             position = self._sync_position(symbol, broker)
             market_state = self._get_market_regime()
@@ -647,22 +637,18 @@ class TradingStrategy:
             force_signal = self._research_force_buy_signal(symbol)
 
             # --- Global macro / news enrichment ---
-            vix_data = fetch_vix_level()
-            vix = vix_data["vix"] if vix_data else 20.0
-            fear_level = vix_data["fear_level"] if vix_data else "moderate"
+            vix = float(context["vix"])
+            fear_level = str(context["fear_level"])
             extreme_fear = fear_level == "extreme"  # VIX > 30 — avoid new entries
             high_fear = fear_level in ("high", "extreme")  # VIX > 20
 
-            news = fetch_news_sentiment(symbol)
-            symbol_news_score = float(news.get("score", 0.0))
-            symbol_news_topics = news.get("topic_scores", {}) or {}
-
-            global_news = fetch_global_macro_sentiment()
-            global_news_score = float(global_news.get("score", 0.0))
-            global_news_topics = global_news.get("topic_scores", {}) or {}
-            external_research = fetch_external_research_sentiment()
-            external_research_score = float(external_research.get("score", 0.0))
-            external_research_topics = external_research.get("topic_scores", {}) or {}
+            news = context["symbol_news"]
+            symbol_news_score = float(context["symbol_news_score"])
+            symbol_news_topics = context["symbol_news_topics"]
+            global_news_score = float(context["global_news_score"])
+            global_news_topics = context["global_news_topics"]
+            external_research_score = float(context["external_research_score"])
+            external_research_topics = context["external_research_topics"]
 
             # Blend symbol-specific and global topic exposure.
             # Symbol headlines get stronger weight; macro headlines provide context.
@@ -682,7 +668,7 @@ class TradingStrategy:
             self.event_learner.observe(symbol, current_price, blended_topic_scores)
             learned_edge_adjustment = self.event_learner.get_edge_adjustment(symbol, blended_topic_scores)
 
-            sector_momentum = fetch_sector_momentum()
+            sector_momentum = context["sector_momentum"]
             # Determine which sector ETF to check based on symbol
             _TECH_SYMBOLS = {"AAPL", "MSFT", "NVDA", "GOOGL", "AMD", "META", "TSLA", "COIN", "PLTR"}
             _ENERGY_SYMBOLS = {"XOM", "CVX", "USO"}
@@ -805,26 +791,23 @@ class TradingStrategy:
                     }
                 )
 
-                if current_price <= stop_loss_price:
-                    return "SELL"
-                if not min_hold_reached:
-                    return "HOLD"
-                if current_price >= take_profit_price and (
-                    effective_predicted_change <= BUY_THRESHOLD_PCT or sentiment <= 0 or trend_strength < 0
-                ):
-                    return "SELL"
-                if effective_predicted_change <= -SELL_THRESHOLD_PCT and (
-                    sentiment < 0 or trend_strength < 0 or recent_return < 0
-                ):
-                    return "SELL"
-                if sentiment <= -2 and recent_return < 0:
-                    return "SELL"
-                if short_trend < long_trend and recent_return <= -SELL_THRESHOLD_PCT:
-                    return "SELL"
-                # Exit if news turns very negative while holding
-                if news_score <= -3 and recent_return < 0:
-                    return "SELL"
-                return "HOLD"
+                return decide_live_position_action(
+                    {
+                        "current_price": current_price,
+                        "stop_loss_price": stop_loss_price,
+                        "take_profit_price": take_profit_price,
+                        "min_hold_reached": min_hold_reached,
+                        "effective_predicted_change": effective_predicted_change,
+                        "buy_threshold": BUY_THRESHOLD_PCT,
+                        "sell_threshold": SELL_THRESHOLD_PCT,
+                        "sentiment": sentiment,
+                        "trend_strength": trend_strength,
+                        "recent_return": recent_return,
+                        "short_trend": short_trend,
+                        "long_trend": long_trend,
+                        "news_score": news_score,
+                    }
+                )
 
             try:
                 open_positions_count = broker.get_open_positions_count() if broker else len(self.positions)
@@ -952,7 +935,16 @@ class TradingStrategy:
             if is_etf:
                 # ETFs: sentiment is unreliable — rely on ML prediction + trend only
                 # Also allow buying ETFs in unfavorable markets as a hedge (e.g. GLD)
-                if trend_confirmation and has_model_edge and positive_momentum:
+                etf_action = decide_model_trend_action(
+                    {
+                        "has_position": False,
+                        "predicted_change": effective_predicted_change,
+                        "trend_confirmation": trend_confirmation,
+                        "momentum": recent_return,
+                        "buy_threshold": dynamic_buy_threshold,
+                    }
+                )
+                if etf_action == "BUY":
                     return "BUY"
                 if has_strong_model_edge and trend_strength >= MIN_TREND_STRENGTH_PCT:
                     return "BUY"
@@ -995,217 +987,3 @@ class TradingStrategy:
         except Exception as e:
             print(f"Error analyzing signal for {symbol}: {e}")
             return "HOLD"
-
-    def execute_trade(self, signal, symbol, broker):
-        """Execute trades with tighter position sizing and restart-safe risk controls."""
-        symbol = symbol.upper()
-        try:
-            if signal == "BUY":
-                if symbol in self.positions:
-                    return None
-                if symbol in self.blocked_symbols_by_improvement:
-                    print(f"Skipping BUY for {symbol}: auto-improvement blocked symbol.")
-                    return None
-                profile = self.autonomy_profile
-                if not bool(profile.get("allow_new_entries", True)):
-                    print(f"Skipping BUY for {symbol}: autonomous gate disabled new entries.")
-                    return None
-
-                effective_max_positions = max(
-                    1,
-                    int(MAX_POSITIONS * float(profile.get("max_positions_multiplier", 1.0))),
-                )
-                if broker.get_open_positions_count() >= effective_max_positions:
-                    print(f"Skipping BUY for {symbol}: already at max positions.")
-                    return None
-                if hasattr(broker, "has_pending_buy_order") and broker.has_pending_buy_order(symbol):
-                    print(f"Skipping BUY for {symbol}: pending buy order already exists.")
-                    return None
-                if hasattr(broker, "is_market_open") and not broker.is_market_open(symbol):
-                    print(f"Skipping BUY for {symbol}: regular market is closed for market orders.")
-                    return None
-
-                capital = broker.get_account_balance()
-                current_price = broker.get_current_price(symbol)
-                if current_price <= 0 or capital <= 0:
-                    print(
-                        f"Skipping BUY for {symbol}: invalid capital or price "
-                        f"(capital={capital:.2f}, price={current_price:.4f})."
-                    )
-                    return None
-                portfolio_value = broker.get_portfolio_value()
-                if portfolio_value > 0:
-                    policy_state = self.long_term_policy.record_portfolio_value(portfolio_value)
-                    if policy_state.get("drawdown", 0.0) >= LONG_TERM_MAX_PORTFOLIO_DRAWDOWN_PCT:
-                        print(
-                            f"Skipping BUY for {symbol}: long-term drawdown guard active "
-                            f"({policy_state.get('drawdown', 0.0):.1%})."
-                        )
-                        return None
-
-                entry_analysis = self.last_analysis.get(symbol, {})
-                _rm_base = RISK_PER_TRADE
-                _rm_autonomy = float(profile.get("risk_multiplier", 1.0))
-                regime_risk = float(entry_analysis.get("regime_risk_multiplier", 1.0) or 1.0)
-                _rm_symbol = float(self.symbol_risk_multipliers.get(symbol, 1.0))
-                _rm_setup_rank = float(self.setup_rank_multipliers.get(symbol, 1.0))
-                _rm_drift = max(0.25, min(1.0, float(self.drift_risk_multiplier)))
-                _rm_confidence = max(0.25, min(1.2, float(self.confidence_risk_multiplier)))
-                _rm_force = max(0.05, min(1.0, float(TECH_RESEARCH_FORCE_BUY_RISK_MULTIPLIER))) if bool(entry_analysis.get("research_force_buy_triggered", False)) else 1.0
-                effective_risk_per_trade = _rm_base * _rm_autonomy * regime_risk * _rm_symbol * _rm_setup_rank * _rm_drift * _rm_confidence * _rm_force
-                print(
-                    f"[risk-breakdown] {symbol}: base={_rm_base:.3f} "
-                    f"× autonomy={_rm_autonomy:.2f} "
-                    f"× regime={regime_risk:.2f} "
-                    f"× symbol={_rm_symbol:.2f} "
-                    f"× setup_rank={_rm_setup_rank:.2f} "
-                    f"× drift={_rm_drift:.2f} "
-                    f"× confidence={_rm_confidence:.2f} "
-                    f"× force={_rm_force:.2f} "
-                    f"= {effective_risk_per_trade:.4f} ({effective_risk_per_trade:.1%})"
-                )
-                if bool(entry_analysis.get("research_force_buy_triggered", False)):
-                    pass  # already factored into effective_risk_per_trade above
-                deployable_capital = capital
-                if LONG_HORIZON_ENABLED:
-                    deployable_capital = max(0.0, capital * max(0.0, 1.0 - LONG_HORIZON_CASH_BUFFER_PCT))
-                    effective_risk_per_trade = min(effective_risk_per_trade, float(LONG_HORIZON_MAX_RISK_PER_TRADE))
-                target_qty = int((deployable_capital * effective_risk_per_trade) / current_price)
-                max_affordable_qty = int(deployable_capital // current_price)
-                qty = min(max_affordable_qty, max(1, target_qty)) if max_affordable_qty > 0 else 0
-                if qty <= 0:
-                    print(
-                        f"Skipping BUY for {symbol}: insufficient buying power for one share "
-                        f"(capital={capital:.2f}, price={current_price:.4f}, "
-                        f"risk={effective_risk_per_trade:.4f}, target_qty={target_qty}, "
-                        f"max_affordable_qty={max_affordable_qty})."
-                    )
-                    return None
-
-                proposed_notional = float(qty) * float(current_price)
-                open_notional = broker.get_open_notional() if hasattr(broker, "get_open_notional") else 0.0
-                allowed, reason = self.long_term_policy.can_open_position(
-                    symbol=symbol,
-                    proposed_notional=proposed_notional,
-                    portfolio_value=portfolio_value if portfolio_value > 0 else capital,
-                    open_notional=open_notional,
-                )
-                if not allowed:
-                    print(f"Skipping BUY for {symbol}: {reason}.")
-                    return None
-
-                # Promotion pipeline gate
-                if _pipeline.stage == "shadow":
-                    _pipeline.log_shadow("BUY", symbol, qty, current_price)
-                    print(f"[shadow] Would BUY {symbol}: {qty} shares at ${current_price:.2f} — not submitted")
-                    return None
-                if _pipeline.stage == "canary":
-                    qty = max(1, int(qty * _pipeline.canary_size_fraction))
-
-                _eq_rec = _exec_tracker.start_record("BUY", symbol, qty, current_price)
-                try:
-                    broker.buy(symbol, qty)
-                    _fill = _exec_tracker.poll_fill(broker, symbol, current_price)
-                    _exec_tracker.finish_record(_eq_rec, fill_price=_fill)
-                except Exception as _eq_exc:
-                    _exec_tracker.finish_record(_eq_rec, rejected=True, reject_reason=str(_eq_exc))
-                    raise
-                entry_context = self._build_adaptive_context(
-                    predicted_change=float(entry_analysis.get("effective_predicted_change_pct", 0.0)) / 100.0,
-                    trend_strength=float(entry_analysis.get("trend_strength_pct", 0.0)) / 100.0,
-                    sentiment=float(entry_analysis.get("sentiment", 0.0)),
-                    news_score=float(entry_analysis.get("news_score", 0.0)),
-                    sector_tailwind=bool(entry_analysis.get("sector_tailwind", False)),
-                    high_fear=str(entry_analysis.get("fear_level", "")).lower() in ("high", "extreme"),
-                    market_favorable=bool(entry_analysis.get("market_favorable", True)),
-                )
-                self.positions[symbol] = {
-                    "entry_price": current_price,
-                    "qty": qty,
-                    "entry_context": entry_context,
-                    "entry_ts": time.time(),
-                }
-                self.last_trade_times[symbol] = time.time()
-                if bool(entry_analysis.get("research_force_buy_triggered", False)):
-                    print(
-                        f"BUY signal for {symbol}: {qty} shares at ${current_price:.2f} "
-                        f"[research_force_buy p={float(entry_analysis.get('research_force_buy_probability', 0.0))*100:.1f}% "
-                        f"impact={float(entry_analysis.get('research_force_buy_impact_score', 0.0)):.2f} "
-                        f"evidence={int(entry_analysis.get('research_force_buy_evidence_count', 0))}]"
-                    )
-                else:
-                    print(f"BUY signal for {symbol}: {qty} shares at ${current_price:.2f}")
-                if LONG_HORIZON_ENABLED:
-                    print(
-                        f"Long-horizon sizing active: monthly_contribution=${LONG_HORIZON_MONTHLY_CONTRIBUTION:.2f}, "
-                        f"cash_buffer={LONG_HORIZON_CASH_BUFFER_PCT:.0%}, risk_cap={LONG_HORIZON_MAX_RISK_PER_TRADE:.2%}"
-                    )
-                return {"action": "BUY", "symbol": symbol, "qty": qty, "price": current_price}
-
-            if signal == "SELL":
-                local_position = self.positions.get(symbol, {})
-                synced_position = self._sync_position(symbol, broker)
-                qty = int(round(broker.get_position_size(symbol)))
-                if qty <= 0:
-                    qty = int((synced_position or self.positions.get(symbol, {})).get("qty", 0))
-                if qty <= 0:
-                    print(f"Skipping SELL for {symbol}: no open quantity found.")
-                    self.positions.pop(symbol, None)
-                    return None
-
-                current_price = broker.get_current_price(symbol)
-                entry_price_for_learning = float(
-                    local_position.get("entry_price")
-                    or (synced_position or {}).get("entry_price")
-                    or current_price
-                )
-                entry_context = local_position.get("entry_context")
-                if not entry_context:
-                    analysis = self.last_analysis.get(symbol, {})
-                    entry_context = self._build_adaptive_context(
-                        predicted_change=float(analysis.get("effective_predicted_change_pct", 0.0)) / 100.0,
-                        trend_strength=float(analysis.get("trend_strength_pct", 0.0)) / 100.0,
-                        sentiment=float(analysis.get("sentiment", 0.0)),
-                        news_score=float(analysis.get("news_score", 0.0)),
-                        sector_tailwind=bool(analysis.get("sector_tailwind", False)),
-                        high_fear=str(analysis.get("fear_level", "")).lower() in ("high", "extreme"),
-                        market_favorable=bool(analysis.get("market_favorable", True)),
-                    )
-                hold_minutes = 0.0
-                if local_position.get("entry_ts"):
-                    hold_minutes = (time.time() - float(local_position["entry_ts"])) / 60.0
-
-                # Promotion pipeline gate
-                if _pipeline.stage == "shadow":
-                    _pipeline.log_shadow("SELL", symbol, qty, current_price)
-                    print(f"[shadow] Would SELL {symbol}: {qty} shares at ${current_price:.2f} — not submitted")
-                    return None
-
-                _eq_rec = _exec_tracker.start_record("SELL", symbol, qty, current_price)
-                try:
-                    broker.sell(symbol, qty)
-                    _fill = _exec_tracker.poll_fill(broker, symbol, current_price)
-                    _exec_tracker.finish_record(_eq_rec, fill_price=_fill)
-                except Exception as _eq_exc:
-                    _exec_tracker.finish_record(_eq_rec, rejected=True, reject_reason=str(_eq_exc))
-                    raise
-                self.experience_policy.observe_trade(
-                    symbol=symbol,
-                    entry_context=entry_context,
-                    entry_price=entry_price_for_learning,
-                    exit_price=current_price,
-                    hold_minutes=hold_minutes,
-                )
-                pnl = (float(current_price) - float(entry_price_for_learning)) * float(qty)
-                self.trade_history.append({
-                    "ts": datetime.now(timezone.utc),
-                    "symbol": symbol,
-                    "pnl": float(pnl),
-                })
-                self.positions.pop(symbol, None)
-                self.last_trade_times[symbol] = time.time()
-                print(f"SELL signal for {symbol}: {qty} shares at ${current_price:.2f}")
-                return {"action": "SELL", "symbol": symbol, "qty": qty, "price": current_price}
-        except Exception as e:
-            print(f"Error executing trade for {symbol}: {e}")
-        return None

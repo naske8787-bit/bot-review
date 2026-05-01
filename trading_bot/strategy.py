@@ -57,6 +57,9 @@ from config import (
     LONG_HORIZON_ENABLED,
     LONG_HORIZON_MAX_RISK_PER_TRADE,
     LONG_HORIZON_MONTHLY_CONTRIBUTION,
+    GROWTH_MOMENTUM_BUY_ENABLED,
+    GROWTH_MOMENTUM_MIN_TREND_MULTIPLIER,
+    GROWTH_MOMENTUM_MIN_RETURN_MULTIPLIER,
 )
 from data_fetcher import fetch_capitol_trades, fetch_stock_data, preprocess_data, fetch_vix_level, fetch_news_sentiment, fetch_sector_momentum
 from data_fetcher import fetch_global_macro_sentiment
@@ -73,6 +76,13 @@ from setup_validator import evaluate_equity_setup
 from regime_detector import detect_equity_regime
 from fundamentals import evaluate_company_fundamentals
 from long_term_policy import LongTermPolicy
+from execution_quality import ExecutionQualityTracker as _ExecQualTracker
+from promotion_pipeline import PromotionPipeline as _PromotionPipeline
+
+_EXEC_LOG_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "logs", "execution_quality.jsonl")
+_exec_tracker = _ExecQualTracker(_EXEC_LOG_PATH)
+_PIPELINE_STATE_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "logs")
+_pipeline = _PromotionPipeline("trading", _PIPELINE_STATE_DIR)
 
 
 class TradingStrategy:
@@ -84,6 +94,8 @@ class TradingStrategy:
         self.last_trade_times = {}
         self.symbol_risk_multipliers = {}
         self.setup_rank_multipliers = {}
+        self.drift_risk_multiplier = 1.0
+        self.confidence_risk_multiplier = 1.0
         self.blocked_symbols_by_improvement = set()
         self.active_setup_candidates = set()
         self.last_improvement_rebalance_ts = None
@@ -958,6 +970,27 @@ class TradingStrategy:
                     if macro_boost and has_model_edge and positive_momentum:
                         return "BUY"
 
+                # Growth-momentum path: buys strongly trending stocks independently of
+                # Capitol Trades political signal (which can be up to 45 days stale).
+                # Requires a tighter technical bar to compensate for absent political confirmation.
+                if GROWTH_MOMENTUM_BUY_ENABLED:
+                    growth_trend = (
+                        trend_strength >= MIN_TREND_STRENGTH_PCT * GROWTH_MOMENTUM_MIN_TREND_MULTIPLIER
+                        and current_price > short_trend
+                        and short_trend > long_trend
+                    )
+                    growth_momentum = recent_return >= BUY_THRESHOLD_PCT * GROWTH_MOMENTUM_MIN_RETURN_MULTIPLIER
+                    macro_backing = sector_tailwind or news_bullish
+                    if (
+                        has_model_edge
+                        and growth_trend
+                        and growth_momentum
+                        and macro_backing
+                        and not news_bearish
+                    ):
+                        self.last_analysis[symbol]["entry_path"] = "growth_momentum"
+                        return "BUY"
+
             return "HOLD"
         except Exception as e:
             print(f"Error analyzing signal for {symbol}: {e}")
@@ -1011,13 +1044,28 @@ class TradingStrategy:
                         return None
 
                 entry_analysis = self.last_analysis.get(symbol, {})
-                effective_risk_per_trade = RISK_PER_TRADE * float(profile.get("risk_multiplier", 1.0))
+                _rm_base = RISK_PER_TRADE
+                _rm_autonomy = float(profile.get("risk_multiplier", 1.0))
                 regime_risk = float(entry_analysis.get("regime_risk_multiplier", 1.0) or 1.0)
-                effective_risk_per_trade *= regime_risk
-                effective_risk_per_trade *= float(self.symbol_risk_multipliers.get(symbol, 1.0))
-                effective_risk_per_trade *= float(self.setup_rank_multipliers.get(symbol, 1.0))
+                _rm_symbol = float(self.symbol_risk_multipliers.get(symbol, 1.0))
+                _rm_setup_rank = float(self.setup_rank_multipliers.get(symbol, 1.0))
+                _rm_drift = max(0.25, min(1.0, float(self.drift_risk_multiplier)))
+                _rm_confidence = max(0.25, min(1.2, float(self.confidence_risk_multiplier)))
+                _rm_force = max(0.05, min(1.0, float(TECH_RESEARCH_FORCE_BUY_RISK_MULTIPLIER))) if bool(entry_analysis.get("research_force_buy_triggered", False)) else 1.0
+                effective_risk_per_trade = _rm_base * _rm_autonomy * regime_risk * _rm_symbol * _rm_setup_rank * _rm_drift * _rm_confidence * _rm_force
+                print(
+                    f"[risk-breakdown] {symbol}: base={_rm_base:.3f} "
+                    f"× autonomy={_rm_autonomy:.2f} "
+                    f"× regime={regime_risk:.2f} "
+                    f"× symbol={_rm_symbol:.2f} "
+                    f"× setup_rank={_rm_setup_rank:.2f} "
+                    f"× drift={_rm_drift:.2f} "
+                    f"× confidence={_rm_confidence:.2f} "
+                    f"× force={_rm_force:.2f} "
+                    f"= {effective_risk_per_trade:.4f} ({effective_risk_per_trade:.1%})"
+                )
                 if bool(entry_analysis.get("research_force_buy_triggered", False)):
-                    effective_risk_per_trade *= max(0.05, min(1.0, float(TECH_RESEARCH_FORCE_BUY_RISK_MULTIPLIER)))
+                    pass  # already factored into effective_risk_per_trade above
                 deployable_capital = capital
                 if LONG_HORIZON_ENABLED:
                     deployable_capital = max(0.0, capital * max(0.0, 1.0 - LONG_HORIZON_CASH_BUFFER_PCT))
@@ -1046,7 +1094,22 @@ class TradingStrategy:
                     print(f"Skipping BUY for {symbol}: {reason}.")
                     return None
 
-                broker.buy(symbol, qty)
+                # Promotion pipeline gate
+                if _pipeline.stage == "shadow":
+                    _pipeline.log_shadow("BUY", symbol, qty, current_price)
+                    print(f"[shadow] Would BUY {symbol}: {qty} shares at ${current_price:.2f} — not submitted")
+                    return None
+                if _pipeline.stage == "canary":
+                    qty = max(1, int(qty * _pipeline.canary_size_fraction))
+
+                _eq_rec = _exec_tracker.start_record("BUY", symbol, qty, current_price)
+                try:
+                    broker.buy(symbol, qty)
+                    _fill = _exec_tracker.poll_fill(broker, symbol, current_price)
+                    _exec_tracker.finish_record(_eq_rec, fill_price=_fill)
+                except Exception as _eq_exc:
+                    _exec_tracker.finish_record(_eq_rec, rejected=True, reject_reason=str(_eq_exc))
+                    raise
                 entry_context = self._build_adaptive_context(
                     predicted_change=float(entry_analysis.get("effective_predicted_change_pct", 0.0)) / 100.0,
                     trend_strength=float(entry_analysis.get("trend_strength_pct", 0.0)) / 100.0,
@@ -1112,7 +1175,20 @@ class TradingStrategy:
                 if local_position.get("entry_ts"):
                     hold_minutes = (time.time() - float(local_position["entry_ts"])) / 60.0
 
-                broker.sell(symbol, qty)
+                # Promotion pipeline gate
+                if _pipeline.stage == "shadow":
+                    _pipeline.log_shadow("SELL", symbol, qty, current_price)
+                    print(f"[shadow] Would SELL {symbol}: {qty} shares at ${current_price:.2f} — not submitted")
+                    return None
+
+                _eq_rec = _exec_tracker.start_record("SELL", symbol, qty, current_price)
+                try:
+                    broker.sell(symbol, qty)
+                    _fill = _exec_tracker.poll_fill(broker, symbol, current_price)
+                    _exec_tracker.finish_record(_eq_rec, fill_price=_fill)
+                except Exception as _eq_exc:
+                    _exec_tracker.finish_record(_eq_rec, rejected=True, reject_reason=str(_eq_exc))
+                    raise
                 self.experience_policy.observe_trade(
                     symbol=symbol,
                     entry_context=entry_context,

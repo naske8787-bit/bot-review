@@ -21,6 +21,14 @@ class PerformanceTracker:
         "sentiment",
         "buy_signals",
         "sell_signals",
+        "setup_type",
+        "capitol_confidence",
+        "force_signal",
+        "pattern_score",
+        "news_score",
+        "external_research_score",
+        "autonomy_mode",
+        "market_regime",
         "note",
     ]
     EQUITY_HEADERS = [
@@ -83,6 +91,7 @@ class PerformanceTracker:
         qty = int(qty)
         price = float(price)
 
+        force = analysis.get("force_signal") or {}
         row = {
             "timestamp": self._timestamp(),
             "action": str(action).upper(),
@@ -95,6 +104,14 @@ class PerformanceTracker:
             "sentiment": int(analysis.get("sentiment", 0)),
             "buy_signals": int(analysis.get("buy_signals", 0)),
             "sell_signals": int(analysis.get("sell_signals", 0)),
+            "setup_type": str(analysis.get("validated_setup") or "none"),
+            "capitol_confidence": f"{float(analysis.get('capitol_data_confidence', 0.0)):.4f}",
+            "force_signal": "1" if force.get("triggered") else "0",
+            "pattern_score": f"{float(analysis.get('pattern_score', 0.0)):.4f}",
+            "news_score": f"{float(analysis.get('news_score', 0.0)):.4f}",
+            "external_research_score": f"{float(analysis.get('external_research_score', 0.0)):.4f}",
+            "autonomy_mode": str(analysis.get("autonomy_mode") or "normal"),
+            "market_regime": str(analysis.get("market_regime") or ""),
             "note": note,
         }
         self._append_row(self.trade_log_path, self.TRADE_HEADERS, row)
